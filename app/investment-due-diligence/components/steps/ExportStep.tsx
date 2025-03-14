@@ -34,12 +34,17 @@ import {
     Printer,
     Share2
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+// 导入file-saver
+// @ts-ignore
+import { saveAs } from 'file-saver'
 
 import {
     investmentRecommendationAtom,
     selectedCompanyAtom
 } from '../../stores/investmentStore'
+
+// 删除无效的模块声明
 
 export function ExportStep() {
   // Jotai 状态
@@ -52,6 +57,62 @@ export function ExportStep() {
   const [isExporting, setIsExporting] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [pdfMakeReady, setPdfMakeReady] = useState(false)
+  
+  // 报告内容的ref，用于HTML到PDF转换
+  const reportContentRef = useRef<HTMLDivElement>(null)
+
+  // 初始化pdfMake - 仅在客户端执行，使用动态导入
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 动态导入pdfMake相关模块
+      const initPdfMake = async () => {
+        try {
+          // 动态导入
+          // @ts-ignore
+          const pdfMakeModule = await import('pdfmake/build/pdfmake');
+          // @ts-ignore
+          const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
+          
+          // 获取实例
+          // @ts-ignore
+          const pdfMake = pdfMakeModule.default;
+          
+          // 安全检查
+          if (pdfMake && pdfFontsModule.default && pdfFontsModule.default.pdfMake && pdfFontsModule.default.pdfMake.vfs) {
+            // 初始化字体
+            pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs;
+            
+            // 设置字体
+            pdfMake.fonts = {
+              Roboto: {
+                normal: 'Roboto-Regular.ttf',
+                bold: 'Roboto-Medium.ttf',
+                italics: 'Roboto-Italic.ttf',
+                bolditalics: 'Roboto-MediumItalic.ttf'
+              },
+              SimSun: {
+                normal: 'Roboto-Regular.ttf',
+                bold: 'Roboto-Medium.ttf',
+                italics: 'Roboto-Italic.ttf',
+                bolditalics: 'Roboto-MediumItalic.ttf'
+              }
+            };
+            
+            // 标记初始化完成
+            setPdfMakeReady(true);
+            console.log('pdfMake initialized successfully');
+          } else {
+            console.error('pdfMake or pdfFontsModule is not properly loaded');
+          }
+        } catch (error) {
+          console.error('Failed to initialize pdfMake:', error);
+        }
+      };
+      
+      initPdfMake();
+    }
+  }, []);
 
   // 处理导出
   const handleExport = async () => {
@@ -60,18 +121,364 @@ export function ExportStep() {
     setIsExporting(true)
     
     try {
-      // 导出逻辑实现
-      // 实际项目中需要实现PDF或Word文档生成
-      // 这里仅作演示，模拟导出过程
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // 根据选择的格式导出文件
+      if (exportFormat === 'pdf') {
+        // 检查pdfMake是否已初始化
+        if (!pdfMakeReady) {
+          // 如果pdfMake未准备好，动态导入并初始化
+          // @ts-ignore
+          const pdfMakeModule = await import('pdfmake/build/pdfmake');
+          // @ts-ignore
+          const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
+          
+          // @ts-ignore
+          const pdfMake = pdfMakeModule.default;
+          
+          // 安全检查
+          if (!pdfMake || !pdfFontsModule.default || !pdfFontsModule.default.pdfMake || !pdfFontsModule.default.pdfMake.vfs) {
+            throw new Error('PDF生成库加载失败，请刷新页面重试');
+          }
+          
+          // 初始化
+          pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs;
+          
+          pdfMake.fonts = {
+            Roboto: {
+              normal: 'Roboto-Regular.ttf',
+              bold: 'Roboto-Medium.ttf',
+              italics: 'Roboto-Italic.ttf',
+              bolditalics: 'Roboto-MediumItalic.ttf'
+            },
+            SimSun: {
+              normal: 'Roboto-Regular.ttf',
+              bold: 'Roboto-Medium.ttf',
+              italics: 'Roboto-Italic.ttf',
+              bolditalics: 'Roboto-MediumItalic.ttf'
+            }
+          };
+        }
       
-      // 模拟下载操作
-      const dummyLink = document.createElement('a')
-      dummyLink.href = '#'
-      dummyLink.setAttribute('download', `${selectedCompany?.Name || '企业'}_投资建议书.${exportFormat}`)
-      dummyLink.click()
+        const companyName = selectedCompany?.Name || '企业'
+        const fileName = `${companyName}_投资建议书.pdf`
+        
+        // 创建PDF文档定义
+        const docDefinition = {
+          // 设置页面默认值
+          defaultStyle: {
+            font: 'SimSun',  // 使用中文字体
+            fontSize: 10,
+            lineHeight: 1.5
+          },
+          // 页眉
+          header: function(currentPage: number, pageCount: number) {
+            return { 
+              text: `第 ${currentPage} 页 / 共 ${pageCount} 页`,
+              alignment: 'right',
+              margin: [0, 10, 20, 0],
+              fontSize: 8,
+              color: '#666666'
+            };
+          },
+          // 页脚
+          footer: function() {
+            return { 
+              text: '本报告由投资尽调报告生成器生成，仅供参考',
+              alignment: 'center',
+              margin: [0, 0, 0, 10],
+              fontSize: 8,
+              color: '#666666'
+            };
+          },
+          // 内容
+          content: [
+            // 标题
+            {
+              text: `${companyName} 投资建议书`,
+              style: 'header',
+              alignment: 'center',
+              margin: [0, 0, 0, 5]
+            },
+            {
+              text: `生成日期: ${new Date().toLocaleDateString()}`,
+              alignment: 'center',
+              margin: [0, 0, 0, 20],
+              fontSize: 10,
+              color: '#666666'
+            },
+            
+            // 公司基本情况
+            {
+              text: '一、公司基本情况',
+              style: 'sectionHeader'
+            },
+            {
+              text: [
+                { text: '公司名称：', bold: true },
+                recommendation.companyBasicInfo.name,
+                '\n',
+                { text: '统一社会信用代码：', bold: true },
+                recommendation.companyBasicInfo.creditCode,
+                '\n',
+                { text: '成立日期：', bold: true },
+                recommendation.companyBasicInfo.establishDate,
+                '\n',
+                { text: '注册资本：', bold: true },
+                recommendation.companyBasicInfo.registeredCapital,
+                '\n',
+                { text: '注册地址：', bold: true },
+                recommendation.companyBasicInfo.address,
+                '\n',
+                { text: '经营范围：', bold: true },
+                recommendation.companyBasicInfo.businessScope
+              ],
+              margin: [0, 5, 0, 15]
+            },
+            
+            // 团队简介
+            {
+              text: '二、团队简介',
+              style: 'sectionHeader'
+            },
+            {
+              text: '核心成员：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.teamInfo.coreMembers,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '团队背景：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.teamInfo.background,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '相关经验：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.teamInfo.experience,
+              margin: [10, 0, 0, 15]
+            },
+            
+            // 产品与技术
+            {
+              text: '三、产品与技术',
+              style: 'sectionHeader'
+            },
+            {
+              text: '主要产品：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.productAndTechnology.mainProducts,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '技术优势：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.productAndTechnology.technologyAdvantage,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '专利情况：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.productAndTechnology.patents,
+              margin: [10, 0, 0, 15]
+            },
+            
+            // 业务模式
+            {
+              text: '四、业务模式',
+              style: 'sectionHeader'
+            },
+            {
+              text: '收入来源：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.businessModel.revenueStream,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '客户情况：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.businessModel.customers,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '竞争优势：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.businessModel.competitiveAdvantage,
+              margin: [10, 0, 0, 15]
+            },
+            
+            // 市场分析
+            {
+              text: '五、市场分析',
+              style: 'sectionHeader'
+            },
+            {
+              text: '行业规模：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.marketAnalysis.industrySize,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '成长性：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.marketAnalysis.growth,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '成熟度：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.marketAnalysis.maturity,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '竞争格局：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.marketAnalysis.competition,
+              margin: [10, 0, 0, 15]
+            },
+            
+            // 投资建议
+            {
+              text: '六、投资建议',
+              style: 'sectionHeader'
+            },
+            {
+              text: '融资计划：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.investmentSuggestion.financingPlan,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '估值分析：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.investmentSuggestion.valuationAnalysis,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '风险：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.investmentSuggestion.risks,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '机会：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.investmentSuggestion.opportunities,
+              margin: [10, 0, 0, 5]
+            },
+            {
+              text: '建议：',
+              bold: true,
+              margin: [0, 5, 0, 2]
+            },
+            {
+              text: recommendation.investmentSuggestion.recommendation,
+              margin: [10, 0, 0, 5]
+            }
+          ],
+          // 样式定义
+          styles: {
+            header: {
+              fontSize: 18,
+              bold: true,
+              margin: [0, 0, 0, 10]
+            },
+            sectionHeader: {
+              fontSize: 14,
+              bold: true,
+              margin: [0, 10, 0, 5]
+            }
+          }
+        };
+        
+        // 动态导入再次检查
+        // @ts-ignore
+        const pdfMakeModule = await import('pdfmake/build/pdfmake');
+        // @ts-ignore
+        const pdfMake = pdfMakeModule.default;
+        
+        // 创建PDF并下载
+        pdfMake.createPdf(docDefinition).download(fileName);
+      } else if (exportFormat === 'docx') {
+        // 在实际项目中可以添加docx导出逻辑
+        // 这里为了演示，暂时使用Blob创建一个简单的文本文档
+        const companyName = selectedCompany?.Name || '企业'
+        const content = `
+${companyName} 投资建议书
+生成日期: ${new Date().toLocaleDateString()}
+
+一、公司基本情况
+公司名称：${recommendation.companyBasicInfo.name}
+统一社会信用代码：${recommendation.companyBasicInfo.creditCode}
+成立日期：${recommendation.companyBasicInfo.establishDate}
+注册资本：${recommendation.companyBasicInfo.registeredCapital}
+注册地址：${recommendation.companyBasicInfo.address}
+经营范围：${recommendation.companyBasicInfo.businessScope}
+
+二、团队简介
+核心成员：
+${recommendation.teamInfo.coreMembers}
+团队背景：
+${recommendation.teamInfo.background}
+相关经验：
+${recommendation.teamInfo.experience}
+        `
+        const blob = new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+        saveAs(blob, `${companyName}_投资建议书.docx`)
+      }
     } catch (error) {
       console.error('导出失败:', error)
+      alert('导出失败，请稍后重试：' + (error instanceof Error ? error.message : '未知错误'))
     } finally {
       setIsExporting(false)
     }
@@ -148,7 +555,7 @@ export function ExportStep() {
               <CardDescription>生成日期: {new Date().toLocaleDateString()}</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="space-y-8 max-w-3xl mx-auto">
+              <div className="space-y-8 max-w-3xl mx-auto" ref={reportContentRef}>
                 {/* 公司基本情况 */}
                 <section>
                   <h2 className="text-xl font-semibold mb-4">一、公司基本情况</h2>

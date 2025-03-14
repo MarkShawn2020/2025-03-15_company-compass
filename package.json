@@ -11,6 +11,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-avatar": "^1.1.3",
     "@radix-ui/react-dialog": "^1.0.5",
@@ -36,11 +37,13 @@
     "drizzle-kit": "^0.30.5",
     "drizzle-orm": "^0.40.0",
     "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
     "jose": "^6.0.8",
     "jotai": "^2.6.5",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.479.0",
     "next": "15.2.2-canary.3",
+    "pdfmake": "^0.2.18",
     "postcss": "^8.5.3",
     "postgres": "^3.4.5",
     "react": "19.0.0",
@@ -53,5 +56,8 @@
     "tailwindcss-react-aria-components": "2.0.0",
     "typescript": "^5.8.2",
     "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/file-saver": "^2.0.7"
   }
 }
