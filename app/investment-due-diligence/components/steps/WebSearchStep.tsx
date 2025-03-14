@@ -58,7 +58,11 @@ export function WebSearchStep() {
     setErrorState({ ...errorState, webSearchError: null })
     
     try {
-      const results = await webSearch(companyDetail.Name)
+      // 构建搜索关键词 - 使用公司名称和核心业务领域
+      const searchQuery = `${companyDetail.Name} 公司简介 商业模式 融资`;
+      console.log('执行网络搜索，关键词:', searchQuery);
+      
+      const results = await webSearch(searchQuery)
       setWebSearchResults(results)
     } catch (error) {
       setErrorState({ 
@@ -140,10 +144,22 @@ export function WebSearchStep() {
                   </Card>
                 ))}
               </div>
+              
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="text-sm text-amber-800">
+                  <strong>提示:</strong> 这些网络搜索结果将用于生成投资建议书，提供公司背景、
+                  业务模式、市场竞争情况等关键信息。如果这些结果不够准确或不全面，可点击"重新搜索"按钮尝试
+                  获取更多信息。
+                </p>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-between mt-4">
+            <Button onClick={performWebSearch} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              重新搜索
+            </Button>
             <Button onClick={handleNext}>
               继续
               <ArrowRight className="ml-2 h-4 w-4" />

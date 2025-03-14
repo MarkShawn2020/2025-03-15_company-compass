@@ -145,20 +145,53 @@ export async function getCompanyDetail(searchKey: string): Promise<QccCompanyDet
 // 博查网络搜索API
 export async function webSearch(query: string): Promise<BochaSearchResult[]> {
   try {
-    // 模拟API响应，实际项目中需要替换为真实API调用
-    // const response = await bochaClient.post('/web-search', {
-    //   query: query,
-    //   freshness: "noLimit",
-    //   summary: true,
-    //   count: 10
-    // });
-    // return response.data.data.webPages.value;
+    if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+      console.log('使用模拟数据进行网络搜索');
+      return mockWebSearch(query);
+    }
     
-    // 开发时的模拟数据
-    return mockWebSearch(query);
+    console.log('正在进行网络搜索，关键词:', query);
+    
+    // 调用我们的博查API代理
+    const response = await apiClient.post('/bocha/search', {
+      query,
+      freshness: 'noLimit', // 默认不限时间
+      summary: true,        // 返回摘要
+      count: 10,            // 返回10条结果
+      page: 1               // 第一页
+    });
+    
+    // 打印原始响应数据以便调试
+    console.log('博查API响应:', JSON.stringify(response.data).substring(0, 500) + '...');
+    
+    // 检查API响应状态
+    if (response.data.code !== 200) {
+      throw new Error(`API错误: ${response.data.msg || '未知错误'}`);
+    }
+    
+    // 检查是否有搜索结果
+    if (!response.data.data || !response.data.data.webPages || !response.data.data.webPages.value) {
+      console.warn('博查API返回空结果');
+      return [];
+    }
+    
+    // 转换为应用所需的数据格式
+    return response.data.data.webPages.value.map((item: any) => ({
+      name: item.name,
+      url: item.url,
+      snippet: item.snippet,
+      summary: item.summary,
+      siteName: item.siteName,
+      dateLastCrawled: item.dateLastCrawled
+    }));
   } catch (error) {
     console.error('网络搜索失败:', error);
-    throw new Error('网络搜索时发生错误');
+    // 如果是开发环境但模拟数据标志未设置，则返回模拟数据
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('使用模拟数据作为备选');
+      return mockWebSearch(query);
+    }
+    throw new Error(`网络搜索时发生错误: ${error instanceof Error ? error.message : '未知错误'}`);
   }
 }
 
