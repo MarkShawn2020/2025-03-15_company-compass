@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { signToken, verifyToken } from '@/lib/auth/session';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
+// Instead of using export const runtime, use the export config
+// to set middleware to use Node.js runtime
 const protectedRoutes = '/dashboard';
 
 export async function middleware(request: NextRequest) {

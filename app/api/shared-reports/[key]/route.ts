@@ -6,10 +6,10 @@ import { NextRequest, NextResponse } from 'next/server'
  */
 export async function GET(
   request: NextRequest,
-  context: { params: { key: string } }
+  { params }: { params: Promise<{ key: string }> }
 ) {
   try {
-    const { key } = context.params
+    const { key } = await params
     
     // 在实际应用中，这里应该从数据库获取共享报告数据
     // 例如：const report = await db.reports.findUnique({ where: { id: key } })

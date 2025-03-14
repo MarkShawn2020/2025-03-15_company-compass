@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { use, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { InvestmentRecommendation } from '@/app/investment-due-diligence/models/types'
 
@@ -14,18 +14,32 @@ type PageParams = {
   key: string;
 }
 
-export default function SharedReportPage({ params }: { params: PageParams | Promise<PageParams> }) {
-  // 使用 React.use() 解包 params 对象
-  const resolvedParams = use(params as Promise<PageParams>);
-  const key = resolvedParams.key;
-
+export default function SharedReportPage({ params }: { params: Promise<PageParams> }) {
+  const [key, setKey] = useState<string | null>(null);
   const [report, setReport] = useState<InvestmentRecommendation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   
+  // 解析 params
+  useEffect(() => {
+    const resolveParams = async () => {
+      try {
+        const resolvedParams = await params;
+        setKey(resolvedParams.key);
+      } catch (err) {
+        console.error('解析参数错误:', err);
+        setError('无法加载页面参数');
+      }
+    };
+    
+    resolveParams();
+  }, [params]);
+  
   // 获取报告数据
   useEffect(() => {
+    if (!key) return;
+
     const fetchReport = async () => {
       try {
         setLoading(true)
