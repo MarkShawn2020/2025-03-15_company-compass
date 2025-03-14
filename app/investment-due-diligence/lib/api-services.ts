@@ -28,14 +28,6 @@ apiClient.interceptors.response.use(
   }
 );
 
-const bochaClient = axios.create({
-  baseURL: 'https://api.bochaai.com/v1',
-  headers: {
-    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_BOCHA_API_KEY}`,
-    'Content-Type': 'application/json',
-  }
-});
-
 const deepseekClient = axios.create({
   baseURL: 'https://api.deepseek.com',
   headers: {
@@ -207,31 +199,121 @@ export async function generateInvestmentRecommendation(
       webSearchInfo: webSearchResults
     };
     
-    // 模拟API响应，实际项目中需要替换为真实API调用
-    // const response = await deepseekClient.post('/v1/chat/completions', {
-    //   model: "deepseek-chat",
-    //   messages: [
-    //     {
-    //       role: "system",
-    //       content: "你是一个专业的投资分析师，需要基于提供的公司信息和网络搜索结果，生成一份全面的投资建议书。"
-    //     },
-    //     {
-    //       role: "user",
-    //       content: JSON.stringify(inputData)
-    //     }
-    //   ],
-    //   response_format: {
-    //     type: "json_object"
-    //   }
-    // });
-    // 
-    // return JSON.parse(response.data.choices[0].message.content);
+    // 使用环境变量标志决定是使用真实API还是模拟数据
+    if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+      console.log('使用模拟数据生成投资建议书');
+      return mockGenerateInvestmentRecommendation(companyDetail, webSearchResults);
+    }
     
-    // 开发时的模拟数据
-    return mockGenerateInvestmentRecommendation(companyDetail, webSearchResults);
+    console.log('调用DeepSeek API生成投资建议书');
+    
+    // 创建一个JSON结构的示例，帮助模型理解我们期望的输出格式
+    const jsonExample = {
+      "companyBasicInfo": {
+        "name": "公司名称",
+        "creditCode": "统一社会信用代码",
+        "establishDate": "成立日期",
+        "registeredCapital": "注册资本",
+        "businessScope": "经营范围概述",
+        "address": "注册地址"
+      },
+      "teamInfo": {
+        "coreMembers": "核心成员及其背景介绍",
+        "background": "团队整体背景评价",
+        "experience": "团队过往经验和成就"
+      },
+      "productAndTechnology": {
+        "mainProducts": "主要产品或服务列表及简介",
+        "technologyAdvantage": "技术优势分析",
+        "patents": "专利、知识产权情况"
+      },
+      "businessModel": {
+        "revenueStream": "收入来源及商业模式",
+        "customers": "主要客户群体分析",
+        "competitiveAdvantage": "竞争优势分析"
+      },
+      "marketAnalysis": {
+        "industrySize": "行业规模数据",
+        "growth": "市场增长趋势",
+        "maturity": "市场成熟度分析",
+        "competition": "竞争格局分析"
+      },
+      "investmentSuggestion": {
+        "financingPlan": "融资计划建议",
+        "valuationAnalysis": "估值分析",
+        "risks": "投资风险分析",
+        "opportunities": "投资机会点",
+        "recommendation": "最终投资建议"
+      }
+    };
+    
+    // 创建一个详细的系统提示词
+    const systemPrompt = `你是一位专业的投资分析师，精通企业尽职调查和投资评估。
+请基于提供的公司信息和网络搜索结果，生成一份全面、专业且客观的投资建议书。
+
+请注意以下要求：
+1. 分析内容必须基于提供的事实数据，避免编造或添加虚构内容
+2. 使用专业的金融和投资术语，但确保内容通俗易懂
+3. 分析要客观中立，同时指出风险与机会
+4. 对公司的竞争优势和劣势要有深入分析
+5. 对市场前景和估值逻辑要有合理论证
+6. 最终给出清晰的投资建议
+
+你的输出必须是有效的JSON格式，结构应与下面的示例一致：
+${JSON.stringify(jsonExample, null, 2)}
+
+请严格按照此JSON结构输出，不要添加额外的字段或修改字段名称。`;
+
+    // 调用DeepSeek API
+    const response = await deepseekClient.post('/v1/chat/completions', {
+      model: "deepseek-chat",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: `请根据以下公司信息和网络搜索结果，生成一份JSON格式的投资建议书：\n\n${JSON.stringify(inputData, null, 2)}`
+        }
+      ],
+      response_format: {
+        type: "json_object"
+      },
+      max_tokens: 4000, // 设置足够长的输出长度，确保完整的JSON
+      temperature: 0.2  // 低温度参数使输出更加确定和精确
+    });
+    
+    // 解析API响应
+    console.log('DeepSeek API响应成功');
+    const content = response.data.choices[0].message.content;
+    
+    // 确保返回的是有效的JSON
+    try {
+      const result = JSON.parse(content);
+      
+      // 验证返回的数据结构是否符合我们的期望
+      // 如果缺少关键字段，可以使用默认值代替或抛出错误
+      if (!result.companyBasicInfo || !result.teamInfo || !result.productAndTechnology || 
+          !result.businessModel || !result.marketAnalysis || !result.investmentSuggestion) {
+        console.error('API返回的JSON结构不完整:', result);
+        throw new Error('生成的投资建议书结构不完整');
+      }
+      
+      return result as InvestmentRecommendation;
+    } catch (parseError) {
+      console.error('解析DeepSeek API返回的JSON失败:', parseError);
+      console.error('原始内容:', content);
+      throw new Error('解析生成的投资建议书失败');
+    }
   } catch (error) {
     console.error('生成投资建议书失败:', error);
-    throw new Error('生成投资建议书时发生错误');
+    // 如果在开发环境中API调用失败，则回退到模拟数据
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('API调用失败，使用模拟数据作为备选');
+      return mockGenerateInvestmentRecommendation(companyDetail, webSearchResults);
+    }
+    throw new Error(error instanceof Error ? `生成投资建议书时发生错误: ${error.message}` : '生成投资建议书时发生未知错误');
   }
 }
 

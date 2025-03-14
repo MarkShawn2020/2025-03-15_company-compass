@@ -14,9 +14,11 @@ import { useAtom } from 'jotai'
 import {
     ArrowRight,
     Brain,
+    CheckCircle,
+    Loader2,
     RefreshCw
 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
     generateInvestmentRecommendation
@@ -41,6 +43,22 @@ export function RecommendationStep() {
   const [currentStep, setCurrentStep] = useAtom(currentStepAtom)
   const [loadingState, setLoadingState] = useAtom(loadingStateAtom)
   const [errorState, setErrorState] = useAtom(errorStateAtom)
+  
+  // 本地状态，用于显示生成进度
+  const [generationPhase, setGenerationPhase] = useState<string>('准备中')
+  const [phaseIndex, setPhaseIndex] = useState<number>(0)
+  
+  // 生成阶段描述
+  const generationPhases = [
+    '准备数据分析',
+    '分析公司基本信息',
+    '分析团队背景',
+    '评估产品与技术',
+    '分析商业模式',
+    '进行市场分析',
+    '制定投资建议',
+    '生成报告'
+  ]
 
   // 当组件挂载或依赖数据变化时生成建议书
   useEffect(() => {
@@ -48,6 +66,36 @@ export function RecommendationStep() {
       generateRecommendation()
     }
   }, [companyDetail, webSearchResults])
+  
+  // 模拟生成进度的效果
+  useEffect(() => {
+    if (loadingState.isGeneratingRecommendation) {
+      const interval = setInterval(() => {
+        // 更新当前阶段
+        setPhaseIndex(prev => {
+          // 如果已经到最后一个阶段，就保持在最后一个阶段
+          if (prev >= generationPhases.length - 1) {
+            clearInterval(interval)
+            return prev
+          }
+          return prev + 1
+        })
+      }, 3000) // 每3秒更新一次阶段
+      
+      return () => clearInterval(interval)
+    } else {
+      // 重置进度
+      setPhaseIndex(0)
+      setGenerationPhase('准备中')
+    }
+  }, [loadingState.isGeneratingRecommendation])
+  
+  // 根据阶段索引更新阶段描述
+  useEffect(() => {
+    if (phaseIndex < generationPhases.length) {
+      setGenerationPhase(generationPhases[phaseIndex])
+    }
+  }, [phaseIndex])
 
   // 生成投资建议书
   const generateRecommendation = async () => {
@@ -55,6 +103,7 @@ export function RecommendationStep() {
     
     setLoadingState({ ...loadingState, isGeneratingRecommendation: true })
     setErrorState({ ...errorState, recommendationError: null })
+    setPhaseIndex(0) // 重置生成阶段
     
     try {
       const result = await generateInvestmentRecommendation(companyDetail, webSearchResults)
@@ -90,11 +139,49 @@ export function RecommendationStep() {
             <Brain className="h-16 w-16 text-primary animate-pulse mb-4" />
             <h3 className="text-lg font-semibold mb-2">AI正在生成投资建议书</h3>
             <p className="text-muted-foreground mb-4">
-              正在分析公司数据和行业信息，生成专业的投资建议书，这可能需要一些时间...
+              当前阶段: <span className="font-medium text-primary">{generationPhase}</span>
             </p>
-            <div className="w-64 h-2 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-primary animate-progress"></div>
+            
+            {/* 进度条 */}
+            <div className="w-full max-w-md mb-6">
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300 ease-in-out" 
+                  style={{ width: `${(phaseIndex / (generationPhases.length - 1)) * 100}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                <span>数据分析</span>
+                <span className="float-right">生成完成</span>
+              </div>
             </div>
+            
+            {/* 进度阶段列表 */}
+            <div className="w-full max-w-md">
+              <ul className="space-y-2">
+                {generationPhases.map((phase, index) => (
+                  <li 
+                    key={index} 
+                    className={`flex items-center text-sm ${
+                      index <= phaseIndex ? 'text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {index < phaseIndex ? (
+                      <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                    ) : index === phaseIndex ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                    ) : (
+                      <div className="mr-2 h-4 w-4 rounded-full border border-muted-foreground" />
+                    )}
+                    {phase}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <p className="text-xs text-muted-foreground mt-6">
+              使用DeepSeek AI分析公司数据并生成投资建议书，这可能需要30秒到1分钟...
+            </p>
           </div>
         </div>
       ) : errorState.recommendationError ? (
@@ -143,11 +230,19 @@ export function RecommendationStep() {
           </div>
         </>
       ) : (
-        <div className="text-center">
-          <Button onClick={generateRecommendation} variant="default">
-            <Brain className="mr-2 h-4 w-4" />
-            生成投资建议书
-          </Button>
+        <div className="text-center p-8">
+          <div className="flex flex-col items-center justify-center max-w-md mx-auto">
+            <Brain className="h-16 w-16 text-primary mb-4" />
+            <h3 className="text-lg font-semibold mb-2">生成投资建议书</h3>
+            <p className="text-muted-foreground mb-6 text-center">
+              通过DeepSeek AI分析公司基本信息和网络搜索结果，生成专业的投资建议书，
+              包括公司分析、团队评估、技术优势、市场前景和投资建议等内容。
+            </p>
+            <Button onClick={generateRecommendation} variant="default" size="lg">
+              <Brain className="mr-2 h-5 w-5" />
+              开始生成投资建议书
+            </Button>
+          </div>
         </div>
       )}
     </div>
