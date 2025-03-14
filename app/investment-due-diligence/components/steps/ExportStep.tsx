@@ -19,8 +19,14 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell, TableRow
+} from '@/components/ui/table'
 import { saveAs } from 'file-saver'
 import { useAtom } from 'jotai'
+import jsPDF from 'jspdf'
 import {
   CheckCircle,
   Copy,
@@ -34,6 +40,10 @@ import {
   investmentRecommendationAtom,
   selectedCompanyAtom
 } from '../../stores/investmentStore'
+
+// 导入中文字体支持
+// 注意：实际项目应该从字体文件或CDN加载字体
+// 这里使用的是一个简单的字体导入示例
 
 export function ExportStep() {
   // Jotai 状态
@@ -87,92 +97,136 @@ export function ExportStep() {
     }
   }
 
-  // 导出为PDF - 使用浏览器自带的打印功能
+  // 导出为PDF
   const exportToPdf = async (markdown: string, filename: string) => {
     try {
-      // 创建一个新窗口用于打印
-      const printWindow = window.open('', '_blank')
-      if (!printWindow) {
-        throw new Error('无法打开打印窗口，请检查是否允许弹出窗口')
-      }
+      // 创建支持中文的PDF文档
+      const doc = new jsPDF()
+      
+      // 使用html2canvas转换内容为图片，避免中文字体问题
+      const contentElement = document.createElement('div')
+      contentElement.style.width = '595px' // A4宽度（72dpi）
+      contentElement.style.padding = '40px'
+      contentElement.style.boxSizing = 'border-box'
+      contentElement.style.fontFamily = 'Arial, "Microsoft YaHei", "微软雅黑", SimHei, "黑体", sans-serif'
+      contentElement.style.lineHeight = '1.5'
+      contentElement.style.fontSize = '14px'
       
       // 将Markdown转换为HTML
       const htmlContent = markdownToHtml(markdown)
+      contentElement.innerHTML = htmlContent
       
-      // 设置窗口内容
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>${filename}</title>
-          <meta charset="utf-8">
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
-            
-            body {
-              font-family: 'Noto Sans SC', sans-serif;
-              padding: 40px;
-              line-height: 1.5;
-              font-size: 14px;
-            }
-            h1 {
-              font-size: 24px;
-              text-align: center;
-              margin-bottom: 20px;
-            }
-            h2 {
-              font-size: 18px;
-              margin-top: 30px;
-              margin-bottom: 15px;
-            }
-            .meta {
-              text-align: center;
-              color: #666;
-              margin-bottom: 30px;
-            }
-            strong {
-              font-weight: bold;
-            }
-            p {
-              margin-bottom: 10px;
-            }
-            .footer {
-              margin-top: 40px;
-              text-align: center;
-              color: #666;
-              font-style: italic;
-            }
-            @media print {
-              body {
-                padding: 0;
-              }
-              @page {
-                margin: 1.5cm;
-                size: A4;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          ${htmlContent}
-        </body>
-        </html>
-      `)
+      // 添加到DOM以便转换
+      document.body.appendChild(contentElement)
       
-      // 等待资源加载完成
-      setTimeout(() => {
-        try {
-          // 执行打印
-          printWindow.document.close()
-          printWindow.focus()
-          printWindow.print()
-          printWindow.close()
-        } catch (e) {
-          console.error('打印过程出错:', e)
-          printWindow.close()
-          throw e
-        }
-      }, 500)
+      // 使用浏览器的打印功能
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>${filename}</title>
+              <style>
+                body {
+                  font-family: Arial, "Microsoft YaHei", "微软雅黑", SimHei, "黑体", sans-serif;
+                  padding: 40px;
+                  max-width: 800px;
+                  margin: 0 auto;
+                  line-height: 1.5;
+                }
+                h1 { font-size: 24px; text-align: center; margin-bottom: 20px; }
+                h2 { font-size: 18px; margin-top: 30px; margin-bottom: 15px; }
+                .meta { text-align: center; color: #666; margin-bottom: 30px; }
+                strong { font-weight: bold; }
+                p { margin-bottom: 10px; }
+                .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
+                
+                /* 表格样式 */
+                table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin: 15px 0;
+                }
+                th, td {
+                  border: 1px solid #ddd;
+                  padding: 8px;
+                  text-align: left;
+                }
+                th {
+                  background-color: #f8f8f8;
+                  font-weight: bold;
+                }
+                
+                @media print {
+                  body { padding: 0; }
+                  @page { margin: 2cm; }
+                }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+              <script>
+                // 自动打印并关闭窗口
+                window.onload = function() {
+                  setTimeout(function() {
+                    window.print();
+                    setTimeout(function() { window.close(); }, 500);
+                  }, 500);
+                };
+              </script>
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+      } else {
+        // 如果无法打开新窗口，提供下载HTML文件的选项
+        const blob = new Blob([`
+          <html>
+            <head>
+              <title>${filename}</title>
+              <style>
+                body {
+                  font-family: Arial, "Microsoft YaHei", "微软雅黑", SimHei, "黑体", sans-serif;
+                  padding: 40px;
+                  max-width: 800px;
+                  margin: 0 auto;
+                  line-height: 1.5;
+                }
+                h1 { font-size: 24px; text-align: center; margin-bottom: 20px; }
+                h2 { font-size: 18px; margin-top: 30px; margin-bottom: 15px; }
+                .meta { text-align: center; color: #666; margin-bottom: 30px; }
+                strong { font-weight: bold; }
+                p { margin-bottom: 10px; }
+                .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
+                
+                /* 表格样式 */
+                table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin: 15px 0;
+                }
+                th, td {
+                  border: 1px solid #ddd;
+                  padding: 8px;
+                  text-align: left;
+                }
+                th {
+                  background-color: #f8f8f8;
+                  font-weight: bold;
+                }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+            </body>
+          </html>
+        `], { type: 'text/html;charset=utf-8' })
+        saveAs(blob, `${filename}.html`)
+        alert('浏览器阻止了打开新窗口。已将报告保存为HTML文件，您可以使用浏览器打开并打印为PDF。')
+      }
+      
+      // 清理DOM
+      document.body.removeChild(contentElement)
     } catch (error) {
       console.error('PDF生成失败:', error)
       throw new Error('PDF生成失败')
@@ -196,6 +250,25 @@ export function ExportStep() {
       .replace(/\n\n/g, '</p><p>')
       // 处理列表项
       .replace(/^\* (.*)$/gm, '<li>$1</li>')
+      // 处理表格
+      .replace(/<!-- TABLE_START -->([\s\S]*?)<!-- TABLE_END -->/g, (match, tableContent) => {
+        // 表格行数据
+        const rows = tableContent.trim().split('\n');
+        let tableHtml = '<table>';
+        
+        rows.forEach((row: string) => {
+          const [label, value] = row.split('|').map((item: string) => item.trim());
+          tableHtml += `
+            <tr>
+              <th>${label}</th>
+              <td>${value}</td>
+            </tr>
+          `;
+        });
+        
+        tableHtml += '</table>';
+        return tableHtml;
+      })
     
     // 包装在段落中
     html = `<h1>${recommendation?.companyBasicInfo.name || '企业'} 投资建议书</h1>
@@ -234,6 +307,24 @@ export function ExportStep() {
               p { margin-bottom: 10px; }
               .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
               
+              /* 表格样式 */
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 15px 0;
+                mso-border-alt: solid windowtext .5pt;
+                mso-padding-alt: 3pt 3pt 3pt 3pt;
+              }
+              th, td {
+                border: 1pt solid windowtext;
+                padding: 5pt;
+                text-align: left;
+              }
+              th {
+                background-color: #f1f1f1;
+                font-weight: bold;
+              }
+              
               /* Word专用样式 */
               @page Section1 {
                 mso-header-margin:.5in;
@@ -241,17 +332,6 @@ export function ExportStep() {
                 mso-paper-source:0;
               }
               div.Section1 {page:Section1;}
-              
-              /* 表格样式 */
-              table {
-                border-collapse: collapse;
-                width: 100%;
-                margin: 15px 0;
-              }
-              td, th {
-                border: 1px solid #ddd;
-                padding: 8px;
-              }
             </style>
             <!-- 告诉浏览器这是Word文档 -->
             <!--[if gte mso 9]>
@@ -287,6 +367,11 @@ export function ExportStep() {
     }
   }
 
+  // 处理打印
+  const handlePrint = () => {
+    window.print()
+  }
+
   // 处理复制链接
   const handleCopyLink = () => {
     // 在实际项目中，这里应该是生成分享链接并复制到剪贴板
@@ -302,17 +387,22 @@ export function ExportStep() {
 
   // 生成Markdown格式的投资建议书
   const generateMarkdown = (data: InvestmentRecommendation, companyName: string): string => {
+    // 生成公司基本信息表格内容
+    const companyInfoTable = `<!-- TABLE_START -->
+公司名称|${data.companyBasicInfo.name}
+统一社会信用代码|${data.companyBasicInfo.creditCode}
+成立日期|${data.companyBasicInfo.establishDate}
+注册资本|${data.companyBasicInfo.registeredCapital}
+注册地址|${data.companyBasicInfo.address}
+经营范围|${data.companyBasicInfo.businessScope}
+<!-- TABLE_END -->`;
+
     return `# ${companyName} 投资建议书
 生成日期: ${new Date().toLocaleDateString()}
 
 ## 一、公司基本情况
 
-**公司名称：**${data.companyBasicInfo.name}
-**统一社会信用代码：**${data.companyBasicInfo.creditCode}
-**成立日期：**${data.companyBasicInfo.establishDate}
-**注册资本：**${data.companyBasicInfo.registeredCapital}
-**注册地址：**${data.companyBasicInfo.address}
-**经营范围：**${data.companyBasicInfo.businessScope}
+${companyInfoTable}
 
 ## 二、团队简介
 
@@ -458,14 +548,34 @@ ${data.investmentSuggestion.recommendation}
             {/* 公司基本情况 */}
             <section>
               <h2 className="text-xl font-semibold mb-4">一、公司基本情况</h2>
-              <div className="space-y-2">
-                <p><strong>公司名称：</strong>{recommendation.companyBasicInfo.name}</p>
-                <p><strong>统一社会信用代码：</strong>{recommendation.companyBasicInfo.creditCode}</p>
-                <p><strong>成立日期：</strong>{recommendation.companyBasicInfo.establishDate}</p>
-                <p><strong>注册资本：</strong>{recommendation.companyBasicInfo.registeredCapital}</p>
-                <p><strong>注册地址：</strong>{recommendation.companyBasicInfo.address}</p>
-                <p><strong>经营范围：</strong>{recommendation.companyBasicInfo.businessScope}</p>
-              </div>
+              <Table>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium w-1/4">公司名称</TableCell>
+                    <TableCell>{recommendation.companyBasicInfo.name}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">统一社会信用代码</TableCell>
+                    <TableCell>{recommendation.companyBasicInfo.creditCode}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">成立日期</TableCell>
+                    <TableCell>{recommendation.companyBasicInfo.establishDate}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">注册资本</TableCell>
+                    <TableCell>{recommendation.companyBasicInfo.registeredCapital}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">注册地址</TableCell>
+                    <TableCell>{recommendation.companyBasicInfo.address}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">经营范围</TableCell>
+                    <TableCell className="whitespace-pre-wrap">{recommendation.companyBasicInfo.businessScope}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </section>
             
             {/* 团队简介 */}
@@ -542,8 +652,6 @@ ${data.investmentSuggestion.recommendation}
         </CardContent>
         <CardFooter className="border-t pt-4 flex flex-col sm:flex-row gap-3 justify-center">
           <p className="text-sm text-muted-foreground w-full text-center">本报告由投资尽调报告生成器生成，仅供参考</p>
-          
-
         </CardFooter>
       </Card>
       
