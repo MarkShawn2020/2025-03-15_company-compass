@@ -1,38 +1,38 @@
 'use client'
 
 import {
-    Button
+  Button
 } from '@/components/ui/button'
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card'
 import { useAtom } from 'jotai'
 import {
-    ArrowRight,
-    Brain,
-    CheckCircle,
-    Loader2,
-    RefreshCw
+  ArrowRight,
+  Brain,
+  CheckCircle,
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import {
-    generateInvestmentRecommendation
+  generateInvestmentRecommendation
 } from '../../lib/api-services'
 import {
-    WorkflowStep
+  WorkflowStep
 } from '../../models/types'
 import {
-    companyDetailAtom,
-    currentStepAtom,
-    errorStateAtom,
-    investmentRecommendationAtom,
-    loadingStateAtom,
-    webSearchResultsAtom
+  companyDetailAtom,
+  currentStepAtom,
+  errorStateAtom,
+  investmentRecommendationAtom,
+  loadingStateAtom,
+  webSearchResultsAtom
 } from '../../stores/investmentStore'
 
 export function RecommendationStep() {
@@ -106,9 +106,17 @@ export function RecommendationStep() {
     setPhaseIndex(0) // 重置生成阶段
     
     try {
+      // 添加日志以检查环境变量的值
+      console.log('环境变量 NEXT_PUBLIC_USE_MOCK_DATA 的值:', process.env.NEXT_PUBLIC_USE_MOCK_DATA);
+      console.log('是否将使用模拟数据:', process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true');
+      console.log('DeepSeek API密钥是否配置:', !!process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY);
+      
+      console.log('开始生成投资建议书，正在调用API服务...');
       const result = await generateInvestmentRecommendation(companyDetail, webSearchResults)
+      console.log('投资建议书生成完成:', result);
       setRecommendation(result)
     } catch (error) {
+      console.error('生成投资建议书时发生错误:', error);
       setErrorState({ 
         ...errorState, 
         recommendationError: error instanceof Error ? error.message : '生成投资建议书时发生未知错误' 
@@ -218,6 +226,14 @@ export function RecommendationStep() {
                 <p className="text-sm text-muted-foreground mt-4">
                   提示: 建议书已生成，但可能需要您在下一步进行细节调整和完善，以确保内容准确与专业。
                 </p>
+                
+                {/* 添加模拟数据模式提示 */}
+                {process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mt-4 text-sm text-amber-800">
+                    <p className="font-medium">注意: 当前使用的是模拟数据</p>
+                    <p>此投资建议书是使用模拟数据生成的，不代表真实API调用结果。如需使用真实数据，请设置环境变量 NEXT_PUBLIC_USE_MOCK_DATA=false</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -238,6 +254,15 @@ export function RecommendationStep() {
               通过DeepSeek AI分析公司基本信息和网络搜索结果，生成专业的投资建议书，
               包括公司分析、团队评估、技术优势、市场前景和投资建议等内容。
             </p>
+            
+            {/* 添加模拟数据模式提示 */}
+            {process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 w-full text-sm text-amber-800">
+                <p className="font-medium">当前处于模拟数据模式</p>
+                <p>生成的投资建议书将使用模拟数据，而不是调用DeepSeek API。如需使用真实API，请设置环境变量 NEXT_PUBLIC_USE_MOCK_DATA=false</p>
+              </div>
+            )}
+            
             <Button onClick={generateRecommendation} variant="default" size="lg">
               <Brain className="mr-2 h-5 w-5" />
               开始生成投资建议书

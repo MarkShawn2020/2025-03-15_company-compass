@@ -36,6 +36,19 @@ const deepseekClient = axios.create({
   }
 });
 
+// 在每次请求前检查和更新Authorization头
+deepseekClient.interceptors.request.use(
+  config => {
+    // 确保每次请求时都使用最新的API密钥
+    config.headers['Authorization'] = `Bearer ${process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY}`;
+    console.log('DeepSeek API请求头已设置，Authorization是否存在:', !!config.headers['Authorization']);
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
+  }
+);
+
 // 企查查企业高级搜索API
 export async function searchCompany(query: string): Promise<QccCompanySearchResult[]> {
   try {
@@ -199,13 +212,27 @@ export async function generateInvestmentRecommendation(
       webSearchInfo: webSearchResults
     };
     
-    // 使用环境变量标志决定是使用真实API还是模拟数据
-    if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+    // 检查环境变量并记录日志
+    console.log('===== 投资建议书生成 =====');
+    console.log('环境变量 NEXT_PUBLIC_USE_MOCK_DATA:', process.env.NEXT_PUBLIC_USE_MOCK_DATA);
+    console.log('环境变量类型:', typeof process.env.NEXT_PUBLIC_USE_MOCK_DATA);
+    
+    // 环境变量在前端始终是字符串，所以需要明确比较字符串 'true'
+    const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+    console.log('是否使用模拟数据:', useMockData);
+    
+    if (useMockData) {
       console.log('使用模拟数据生成投资建议书');
       return mockGenerateInvestmentRecommendation(companyDetail, webSearchResults);
     }
     
-    console.log('调用DeepSeek API生成投资建议书');
+    // 检查API密钥是否配置
+    if (!process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY) {
+      console.error('错误: DeepSeek API密钥未配置!');
+      throw new Error('DeepSeek API密钥未配置，请在.env.local文件中设置NEXT_PUBLIC_DEEPSEEK_API_KEY');
+    }
+    
+    console.log('准备调用DeepSeek API生成投资建议书');
     
     // 创建一个JSON结构的示例，帮助模型理解我们期望的输出格式
     const jsonExample = {
@@ -264,50 +291,67 @@ ${JSON.stringify(jsonExample, null, 2)}
 
 请严格按照此JSON结构输出，不要添加额外的字段或修改字段名称。`;
 
-    // 调用DeepSeek API
-    const response = await deepseekClient.post('/v1/chat/completions', {
-      model: "deepseek-chat",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: `请根据以下公司信息和网络搜索结果，生成一份JSON格式的投资建议书：\n\n${JSON.stringify(inputData, null, 2)}`
-        }
-      ],
-      response_format: {
-        type: "json_object"
-      },
-      max_tokens: 4000, // 设置足够长的输出长度，确保完整的JSON
-      temperature: 0.2  // 低温度参数使输出更加确定和精确
-    });
+    // 记录DeepSeek API的请求信息
+    console.log('DeepSeek API基础URL:', deepseekClient.defaults.baseURL);
+    console.log('DeepSeek API请求路径:', '/v1/chat/completions');
+    console.log('DeepSeek API密钥是否已设置:', !!process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY);
     
-    // 解析API响应
-    console.log('DeepSeek API响应成功');
-    const content = response.data.choices[0].message.content;
-    
-    // 确保返回的是有效的JSON
     try {
-      const result = JSON.parse(content);
+      // 调用DeepSeek API
+      console.log('发送请求到DeepSeek API...');
+      const response = await deepseekClient.post('/v1/chat/completions', {
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: `请根据以下公司信息和网络搜索结果，生成一份JSON格式的投资建议书：\n\n${JSON.stringify(inputData, null, 2)}`
+          }
+        ],
+        response_format: {
+          type: "json_object"
+        },
+        max_tokens: 4000, // 设置足够长的输出长度，确保完整的JSON
+        temperature: 0.2  // 低温度参数使输出更加确定和精确
+      });
       
-      // 验证返回的数据结构是否符合我们的期望
-      // 如果缺少关键字段，可以使用默认值代替或抛出错误
-      if (!result.companyBasicInfo || !result.teamInfo || !result.productAndTechnology || 
-          !result.businessModel || !result.marketAnalysis || !result.investmentSuggestion) {
-        console.error('API返回的JSON结构不完整:', result);
-        throw new Error('生成的投资建议书结构不完整');
+      // 解析API响应
+      console.log('DeepSeek API响应成功, 状态码:', response.status);
+      
+      const content = response.data.choices[0].message.content;
+      console.log('API返回内容的前100个字符:', content.substring(0, 100) + '...');
+      
+      // 确保返回的是有效的JSON
+      try {
+        const result = JSON.parse(content);
+        
+        // 验证返回的数据结构是否符合我们的期望
+        if (!result.companyBasicInfo || !result.teamInfo || !result.productAndTechnology || 
+            !result.businessModel || !result.marketAnalysis || !result.investmentSuggestion) {
+          console.error('API返回的JSON结构不完整:', result);
+          throw new Error('生成的投资建议书结构不完整');
+        }
+        
+        console.log('成功解析API响应为InvestmentRecommendation对象');
+        return result as InvestmentRecommendation;
+      } catch (parseError) {
+        console.error('解析DeepSeek API返回的JSON失败:', parseError);
+        console.error('原始内容:', content);
+        throw new Error('解析生成的投资建议书失败');
       }
-      
-      return result as InvestmentRecommendation;
-    } catch (parseError) {
-      console.error('解析DeepSeek API返回的JSON失败:', parseError);
-      console.error('原始内容:', content);
-      throw new Error('解析生成的投资建议书失败');
+    } catch (apiError: any) {
+      console.error('DeepSeek API调用失败:', apiError);
+      if (apiError.response) {
+        console.error('错误状态码:', apiError.response.status);
+        console.error('错误响应数据:', apiError.response.data);
+      }
+      throw new Error(`DeepSeek API调用失败: ${apiError.message}`);
     }
   } catch (error) {
-    console.error('生成投资建议书失败:', error);
+    console.error('生成投资建议书过程中发生错误:', error);
     // 如果在开发环境中API调用失败，则回退到模拟数据
     if (process.env.NODE_ENV === 'development') {
       console.warn('API调用失败，使用模拟数据作为备选');
