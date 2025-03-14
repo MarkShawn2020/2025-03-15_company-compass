@@ -39,7 +39,6 @@
     "html-docx-js": "^0.3.1",
     "jose": "^6.0.8",
     "jotai": "^2.6.5",
-    "jspdf": "^2.5.1",
     "lucide-react": "^0.479.0",
     "next": "15.2.2-canary.3",
     "postcss": "^8.5.3",
@@ -56,6 +55,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/file-saver": "^2.0.7"
+    "@types/file-saver": "^2.0.7",
+    "@types/pdfmake": "^0.2.11"
   }
 }
