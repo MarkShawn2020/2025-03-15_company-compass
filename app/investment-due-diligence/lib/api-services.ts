@@ -203,7 +203,8 @@ export async function webSearch(query: string): Promise<BochaSearchResult[]> {
 // DeepSeek API生成投资建议书
 export async function generateInvestmentRecommendation(
   companyDetail: QccCompanyDetail,
-  webSearchResults: BochaSearchResult[]
+  webSearchResults: BochaSearchResult[],
+  forceRealApi: boolean = false
 ): Promise<InvestmentRecommendation> {
   try {
     // 构建输入数据
@@ -216,9 +217,10 @@ export async function generateInvestmentRecommendation(
     console.log('===== 投资建议书生成 =====');
     console.log('环境变量 NEXT_PUBLIC_USE_MOCK_DATA:', process.env.NEXT_PUBLIC_USE_MOCK_DATA);
     console.log('环境变量类型:', typeof process.env.NEXT_PUBLIC_USE_MOCK_DATA);
+    console.log('是否强制使用真实API:', forceRealApi);
     
     // 环境变量在前端始终是字符串，所以需要明确比较字符串 'true'
-    const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+    const useMockData = !forceRealApi && process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
     console.log('是否使用模拟数据:', useMockData);
     
     if (useMockData) {

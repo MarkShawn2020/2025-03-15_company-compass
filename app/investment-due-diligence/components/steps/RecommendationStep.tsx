@@ -47,6 +47,8 @@ export function RecommendationStep() {
   // 本地状态，用于显示生成进度
   const [generationPhase, setGenerationPhase] = useState<string>('准备中')
   const [phaseIndex, setPhaseIndex] = useState<number>(0)
+  // 跟踪建议书是否是通过真实API生成的
+  const [isRealApiGenerated, setIsRealApiGenerated] = useState<boolean>(false)
   
   // 生成阶段描述
   const generationPhases = [
@@ -98,7 +100,7 @@ export function RecommendationStep() {
   }, [phaseIndex])
 
   // 生成投资建议书
-  const generateRecommendation = async () => {
+  const generateRecommendation = async (forceRealApi: boolean = false) => {
     if (!companyDetail || webSearchResults.length === 0) return
     
     setLoadingState({ ...loadingState, isGeneratingRecommendation: true })
@@ -108,13 +110,15 @@ export function RecommendationStep() {
     try {
       // 添加日志以检查环境变量的值
       console.log('环境变量 NEXT_PUBLIC_USE_MOCK_DATA 的值:', process.env.NEXT_PUBLIC_USE_MOCK_DATA);
-      console.log('是否将使用模拟数据:', process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true');
+      console.log('是否将使用模拟数据:', !forceRealApi && process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true');
       console.log('DeepSeek API密钥是否配置:', !!process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY);
+      console.log('强制使用真实API:', forceRealApi);
       
       console.log('开始生成投资建议书，正在调用API服务...');
-      const result = await generateInvestmentRecommendation(companyDetail, webSearchResults)
+      const result = await generateInvestmentRecommendation(companyDetail, webSearchResults, forceRealApi)
       console.log('投资建议书生成完成:', result);
       setRecommendation(result)
+      setIsRealApiGenerated(forceRealApi)
     } catch (error) {
       console.error('生成投资建议书时发生错误:', error);
       setErrorState({ 
@@ -195,7 +199,7 @@ export function RecommendationStep() {
       ) : errorState.recommendationError ? (
         <div className="text-center">
           <p className="text-red-500 mb-2">{errorState.recommendationError}</p>
-          <Button onClick={generateRecommendation} variant="outline">
+          <Button onClick={() => generateRecommendation(true)} variant="outline">
             <RefreshCw className="mr-2 h-4 w-4" />
             重试
           </Button>
@@ -207,6 +211,12 @@ export function RecommendationStep() {
               <CardTitle>投资建议书生成完成</CardTitle>
               <CardDescription>
                 已基于公司信息和网络数据生成初步投资建议书，您可以在下一步中查看和编辑
+                {isRealApiGenerated && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    <CheckCircle className="mr-1 h-3 w-3" />
+                    DeepSeek AI生成
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -228,19 +238,32 @@ export function RecommendationStep() {
                 </p>
                 
                 {/* 添加模拟数据模式提示 */}
-                {process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && (
+                {!isRealApiGenerated && (
                   <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mt-4 text-sm text-amber-800">
                     <p className="font-medium">注意: 当前使用的是模拟数据</p>
-                    <p>此投资建议书是使用模拟数据生成的，不代表真实API调用结果。如需使用真实数据，请设置环境变量 NEXT_PUBLIC_USE_MOCK_DATA=false</p>
+                    <p>此投资建议书是使用模拟数据生成的，不代表真实API调用结果。请点击下方"重新生成建议书"按钮使用DeepSeek AI生成真实内容。</p>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end mt-4">
-            <Button onClick={handleNext}>
-              继续
+          <div className="flex justify-between mt-4">
+            <Button 
+              onClick={() => {
+                // 清除当前建议书并重新生成
+                setRecommendation(null);
+                setPhaseIndex(0);
+                setGenerationPhase('准备中');
+                generateRecommendation(true);
+              }} 
+              variant="outline"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              重新生成建议书
+            </Button>
+            <Button onClick={handleNext} variant="default">
+              继续到下一步
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -258,14 +281,14 @@ export function RecommendationStep() {
             {/* 添加模拟数据模式提示 */}
             {process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && (
               <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 w-full text-sm text-amber-800">
-                <p className="font-medium">当前处于模拟数据模式</p>
-                <p>生成的投资建议书将使用模拟数据，而不是调用DeepSeek API。如需使用真实API，请设置环境变量 NEXT_PUBLIC_USE_MOCK_DATA=false</p>
+                <p className="font-medium">当前环境配置为模拟数据模式</p>
+                <p>点击下方按钮将强制使用DeepSeek AI生成真实建议书，忽略环境变量设置。</p>
               </div>
             )}
             
-            <Button onClick={generateRecommendation} variant="default" size="lg">
+            <Button onClick={() => generateRecommendation(true)} variant="default" size="lg">
               <Brain className="mr-2 h-5 w-5" />
-              开始生成投资建议书
+              使用DeepSeek AI生成建议书
             </Button>
           </div>
         </div>
