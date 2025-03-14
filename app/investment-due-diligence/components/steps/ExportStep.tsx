@@ -55,6 +55,8 @@ export function ExportStep() {
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [copied, setCopied] = useState(false)
   const [markdownContent, setMarkdownContent] = useState('')
+  const [shareUrl, setShareUrl] = useState('')
+  const [isGeneratingShareLink, setIsGeneratingShareLink] = useState(false)
 
   // 生成Markdown内容
   useEffect(() => {
@@ -63,6 +65,40 @@ export function ExportStep() {
       setMarkdownContent(md)
     }
   }, [recommendation, selectedCompany])
+
+  // 打开分享对话框
+  const handleOpenShareDialog = async () => {
+    setShowShareDialog(true)
+    
+    // 如果已经有分享链接，不需要重新生成
+    if (shareUrl) return
+    
+    try {
+      setIsGeneratingShareLink(true)
+      
+      // 保存报告数据到API，获取唯一ID
+      const response = await fetch('/api/shared-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report: recommendation })
+      });
+      
+      if (!response.ok) {
+        throw new Error('保存报告失败');
+      }
+      
+      const { id } = await response.json();
+      
+      // 构建分享链接，使用API返回的ID
+      const url = `${window.location.origin}/shared-report/${id}`;
+      setShareUrl(url);
+    } catch (err) {
+      console.error('生成分享链接失败:', err);
+      alert('生成分享链接时发生错误，请重试');
+    } finally {
+      setIsGeneratingShareLink(false);
+    }
+  }
 
   // 处理导出PDF
   const handleExportPdf = async () => {
@@ -439,16 +475,16 @@ export function ExportStep() {
   }
 
   // 处理复制链接
-  const handleCopyLink = () => {
-    // 在实际项目中，这里应该是生成分享链接并复制到剪贴板
-    navigator.clipboard.writeText(`${window.location.origin}/shared-report/${selectedCompany?.KeyNo || 'example'}`)
-      .then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      })
-      .catch(err => {
-        console.error('复制失败:', err)
-      })
+  const handleCopyLink = async () => {
+    try {
+      // 复制到剪贴板
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('复制失败:', err);
+      alert('复制链接时发生错误，请重试');
+    }
   }
 
   // 生成Markdown格式的投资建议书
@@ -595,7 +631,7 @@ ${data.investmentSuggestion.recommendation}
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setShowShareDialog(true)}
+            onClick={handleOpenShareDialog}
           >
             <Share2 className="h-4 w-4 mr-2" />
             分享
@@ -732,25 +768,34 @@ ${data.investmentSuggestion.recommendation}
           </DialogHeader>
           
           <div className="flex items-center space-x-2 mt-4">
-            <input 
-              type="text" 
-              readOnly 
-              className="flex-1 rounded-md border border-border px-3 py-2 text-sm"
-              value={`${window.location.origin}/shared-report/${selectedCompany?.KeyNo || 'example'}`}
-            />
-            <Button onClick={handleCopyLink} variant="secondary" className="min-w-[80px]">
-              {copied ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                  已复制
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  复制
-                </>
-              )}
-            </Button>
+            {isGeneratingShareLink ? (
+              <div className="flex-1 flex items-center justify-center py-2">
+                <FileText className="h-4 w-4 animate-spin mr-2" />
+                <span>生成分享链接中...</span>
+              </div>
+            ) : (
+              <>
+                <input 
+                  type="text" 
+                  readOnly 
+                  className="flex-1 rounded-md border border-border px-3 py-2 text-sm"
+                  value={shareUrl}
+                />
+                <Button onClick={handleCopyLink} variant="secondary" className="min-w-[80px]">
+                  {copied ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                      已复制
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      复制
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
           
           <DialogFooter className="mt-4">
