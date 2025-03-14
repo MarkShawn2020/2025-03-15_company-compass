@@ -19,12 +19,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger
-} from '@/components/ui/tabs'
 import { saveAs } from 'file-saver'
 import { useAtom } from 'jotai'
 import jsPDF from 'jspdf'
@@ -32,9 +26,7 @@ import {
   CheckCircle,
   Copy,
   Download,
-  FileText,
-  Printer,
-  Share2
+  FileText, Share2
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -54,9 +46,8 @@ export function ExportStep() {
   const [recommendation] = useAtom(investmentRecommendationAtom)
   
   // 本地状态
-  const [activeTab, setActiveTab] = useState('preview')
-  const [exportFormat, setExportFormat] = useState<'pdf' | 'docx'>('pdf')
-  const [isExporting, setIsExporting] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [isExportingDocx, setIsExportingDocx] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [copied, setCopied] = useState(false)
   const [markdownContent, setMarkdownContent] = useState('')
@@ -69,23 +60,35 @@ export function ExportStep() {
     }
   }, [recommendation, selectedCompany])
 
-  // 处理导出
-  const handleExport = async () => {
+  // 处理导出PDF
+  const handleExportPdf = async () => {
     if (!recommendation) return
     
-    setIsExporting(true)
+    // setIsExportingPdf(true)
     
     try {
-      if (exportFormat === 'pdf') {
-        await exportToPdf(markdownContent, `${selectedCompany?.Name || '企业'}_投资建议书`)
-      } else {
-        await exportToDocx(markdownContent, `${selectedCompany?.Name || '企业'}_投资建议书`)
-      }
+      await exportToPdf(markdownContent, `${selectedCompany?.Name || '企业'}_投资建议书`)
     } catch (error) {
-      console.error('导出失败:', error)
-      alert('导出文档时发生错误，请重试')
+      console.error('导出PDF失败:', error)
+      alert('导出PDF时发生错误，请重试')
     } finally {
-      setIsExporting(false)
+      setIsExportingPdf(false)
+    }
+  }
+  
+  // 处理导出Word
+  const handleExportDocx = async () => {
+    if (!recommendation) return
+    
+    setIsExportingDocx(true)
+    
+    try {
+      await exportToDocx(markdownContent, `${selectedCompany?.Name || '企业'}_投资建议书`)
+    } catch (error) {
+      console.error('导出Word文档失败:', error)
+      alert('导出Word文档时发生错误，请重试')
+    } finally {
+      setIsExportingDocx(false)
     }
   }
 
@@ -412,17 +415,48 @@ ${data.investmentSuggestion.recommendation}
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">导出投资建议书</h3>
+        <h3 className="text-lg font-semibold">投资建议书预览</h3>
         
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handlePrint}
-          >
-            <Printer className="h-4 w-4 mr-2" />
-            打印
-          </Button>
+          <div className="flex gap-3 justify-center">
+            <Button 
+              onClick={handleExportPdf} 
+              disabled={isExportingPdf}
+              className="flex items-center gap-2"
+            >
+              {isExportingPdf ? (
+                <>
+                  <FileText className="h-4 w-4 animate-spin" />
+                  生成PDF中...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  下载PDF
+                </>
+              )}
+            </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={handleExportDocx} 
+              disabled={isExportingDocx}
+              className="flex items-center gap-2"
+            >
+              {isExportingDocx ? (
+                <>
+                  <FileText className="h-4 w-4 animate-spin" />
+                  生成Word中...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  下载Word
+                </>
+              )}
+            </Button>
+          </div>
+          
           <Button 
             variant="outline" 
             size="sm"
@@ -434,170 +468,105 @@ ${data.investmentSuggestion.recommendation}
         </div>
       </div>
       
-      <Tabs defaultValue="preview" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-2 w-[400px] mb-4">
-          <TabsTrigger value="preview" className="flex items-center">
-            <FileText className="h-4 w-4 mr-2" />
-            预览
-          </TabsTrigger>
-          <TabsTrigger value="download" className="flex items-center">
-            <Download className="h-4 w-4 mr-2" />
-            下载
-          </TabsTrigger>
-        </TabsList>
-        
-        {/* 预览标签内容 */}
-        <TabsContent value="preview">
-          <Card className="mb-4">
-            <CardHeader className="text-center border-b">
-              <CardTitle className="text-2xl">{selectedCompany?.Name || '公司'} 投资建议书</CardTitle>
-              <CardDescription>生成日期: {new Date().toLocaleDateString()}</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-8 max-w-3xl mx-auto">
-                {/* 公司基本情况 */}
-                <section>
-                  <h2 className="text-xl font-semibold mb-4">一、公司基本情况</h2>
-                  <div className="space-y-2">
-                    <p><strong>公司名称：</strong>{recommendation.companyBasicInfo.name}</p>
-                    <p><strong>统一社会信用代码：</strong>{recommendation.companyBasicInfo.creditCode}</p>
-                    <p><strong>成立日期：</strong>{recommendation.companyBasicInfo.establishDate}</p>
-                    <p><strong>注册资本：</strong>{recommendation.companyBasicInfo.registeredCapital}</p>
-                    <p><strong>注册地址：</strong>{recommendation.companyBasicInfo.address}</p>
-                    <p><strong>经营范围：</strong>{recommendation.companyBasicInfo.businessScope}</p>
-                  </div>
-                </section>
-                
-                {/* 团队简介 */}
-                <section>
-                  <h2 className="text-xl font-semibold mb-4">二、团队简介</h2>
-                  <div className="space-y-2">
-                    <p><strong>核心成员：</strong></p>
-                    <p className="whitespace-pre-line pl-4">{recommendation.teamInfo.coreMembers}</p>
-                    <p><strong>团队背景：</strong></p>
-                    <p className="pl-4">{recommendation.teamInfo.background}</p>
-                    <p><strong>相关经验：</strong></p>
-                    <p className="pl-4">{recommendation.teamInfo.experience}</p>
-                  </div>
-                </section>
-                
-                {/* 产品与技术 */}
-                <section>
-                  <h2 className="text-xl font-semibold mb-4">三、产品与技术</h2>
-                  <div className="space-y-2">
-                    <p><strong>主要产品：</strong></p>
-                    <p className="whitespace-pre-line pl-4">{recommendation.productAndTechnology.mainProducts}</p>
-                    <p><strong>技术优势：</strong></p>
-                    <p className="pl-4">{recommendation.productAndTechnology.technologyAdvantage}</p>
-                    <p><strong>专利情况：</strong></p>
-                    <p className="pl-4">{recommendation.productAndTechnology.patents}</p>
-                  </div>
-                </section>
-                
-                {/* 业务模式 */}
-                <section>
-                  <h2 className="text-xl font-semibold mb-4">四、业务模式</h2>
-                  <div className="space-y-2">
-                    <p><strong>收入来源：</strong></p>
-                    <p className="pl-4">{recommendation.businessModel.revenueStream}</p>
-                    <p><strong>客户情况：</strong></p>
-                    <p className="pl-4">{recommendation.businessModel.customers}</p>
-                    <p><strong>竞争优势：</strong></p>
-                    <p className="pl-4">{recommendation.businessModel.competitiveAdvantage}</p>
-                  </div>
-                </section>
-                
-                {/* 市场分析 */}
-                <section>
-                  <h2 className="text-xl font-semibold mb-4">五、市场分析</h2>
-                  <div className="space-y-2">
-                    <p><strong>行业规模：</strong></p>
-                    <p className="pl-4">{recommendation.marketAnalysis.industrySize}</p>
-                    <p><strong>成长性：</strong></p>
-                    <p className="pl-4">{recommendation.marketAnalysis.growth}</p>
-                    <p><strong>成熟度：</strong></p>
-                    <p className="pl-4">{recommendation.marketAnalysis.maturity}</p>
-                    <p><strong>竞争格局：</strong></p>
-                    <p className="pl-4">{recommendation.marketAnalysis.competition}</p>
-                  </div>
-                </section>
-                
-                {/* 投资建议 */}
-                <section>
-                  <h2 className="text-xl font-semibold mb-4">六、投资建议</h2>
-                  <div className="space-y-2">
-                    <p><strong>融资计划：</strong></p>
-                    <p className="pl-4">{recommendation.investmentSuggestion.financingPlan}</p>
-                    <p><strong>估值分析：</strong></p>
-                    <p className="pl-4">{recommendation.investmentSuggestion.valuationAnalysis}</p>
-                    <p><strong>风险：</strong></p>
-                    <p className="pl-4">{recommendation.investmentSuggestion.risks}</p>
-                    <p><strong>机会：</strong></p>
-                    <p className="pl-4">{recommendation.investmentSuggestion.opportunities}</p>
-                    <p><strong>建议：</strong></p>
-                    <p className="pl-4">{recommendation.investmentSuggestion.recommendation}</p>
-                  </div>
-                </section>
+      {/* 预览内容 */}
+      <Card className="mb-4">
+        <CardHeader className="text-center border-b">
+          <CardTitle className="text-2xl">{selectedCompany?.Name || '公司'} 投资建议书</CardTitle>
+          <CardDescription>生成日期: {new Date().toLocaleDateString()}</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-8 max-w-3xl mx-auto">
+            {/* 公司基本情况 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">一、公司基本情况</h2>
+              <div className="space-y-2">
+                <p><strong>公司名称：</strong>{recommendation.companyBasicInfo.name}</p>
+                <p><strong>统一社会信用代码：</strong>{recommendation.companyBasicInfo.creditCode}</p>
+                <p><strong>成立日期：</strong>{recommendation.companyBasicInfo.establishDate}</p>
+                <p><strong>注册资本：</strong>{recommendation.companyBasicInfo.registeredCapital}</p>
+                <p><strong>注册地址：</strong>{recommendation.companyBasicInfo.address}</p>
+                <p><strong>经营范围：</strong>{recommendation.companyBasicInfo.businessScope}</p>
               </div>
-            </CardContent>
-            <CardFooter className="border-t text-center pt-4 flex justify-center">
-              <p className="text-sm text-muted-foreground">本报告由投资尽调报告生成器生成，仅供参考</p>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        {/* 下载标签内容 */}
-        <TabsContent value="download">
-          <Card>
-            <CardHeader>
-              <CardTitle>下载投资建议书</CardTitle>
-              <CardDescription>
-                选择下载格式，获取完整的投资建议书文档
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                  variant={exportFormat === 'pdf' ? 'default' : 'outline'} 
-                  className="h-24 flex flex-col"
-                  onClick={() => setExportFormat('pdf')}
-                >
-                  <FileText className="h-8 w-8 mb-2" />
-                  <span>PDF格式</span>
-                </Button>
-                <Button 
-                  variant={exportFormat === 'docx' ? 'default' : 'outline'} 
-                  className="h-24 flex flex-col"
-                  onClick={() => setExportFormat('docx')}
-                >
-                  <FileText className="h-8 w-8 mb-2" />
-                  <span>Word文档</span>
-                </Button>
+            </section>
+            
+            {/* 团队简介 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">二、团队简介</h2>
+              <div className="space-y-2">
+                <p><strong>核心成员：</strong></p>
+                <p className="whitespace-pre-line pl-4">{recommendation.teamInfo.coreMembers}</p>
+                <p><strong>团队背景：</strong></p>
+                <p className="pl-4">{recommendation.teamInfo.background}</p>
+                <p><strong>相关经验：</strong></p>
+                <p className="pl-4">{recommendation.teamInfo.experience}</p>
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-center">
-              <Button 
-                size="lg"
-                onClick={handleExport}
-                disabled={isExporting}
-                className="w-1/2"
-              >
-                {isExporting ? (
-                  <>
-                    <FileText className="h-5 w-5 mr-2 animate-spin" />
-                    正在生成...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-5 w-5 mr-2" />
-                    下载{exportFormat === 'pdf' ? 'PDF' : 'Word文档'}
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </section>
+            
+            {/* 产品与技术 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">三、产品与技术</h2>
+              <div className="space-y-2">
+                <p><strong>主要产品：</strong></p>
+                <p className="whitespace-pre-line pl-4">{recommendation.productAndTechnology.mainProducts}</p>
+                <p><strong>技术优势：</strong></p>
+                <p className="pl-4">{recommendation.productAndTechnology.technologyAdvantage}</p>
+                <p><strong>专利情况：</strong></p>
+                <p className="pl-4">{recommendation.productAndTechnology.patents}</p>
+              </div>
+            </section>
+            
+            {/* 业务模式 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">四、业务模式</h2>
+              <div className="space-y-2">
+                <p><strong>收入来源：</strong></p>
+                <p className="pl-4">{recommendation.businessModel.revenueStream}</p>
+                <p><strong>客户情况：</strong></p>
+                <p className="pl-4">{recommendation.businessModel.customers}</p>
+                <p><strong>竞争优势：</strong></p>
+                <p className="pl-4">{recommendation.businessModel.competitiveAdvantage}</p>
+              </div>
+            </section>
+            
+            {/* 市场分析 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">五、市场分析</h2>
+              <div className="space-y-2">
+                <p><strong>行业规模：</strong></p>
+                <p className="pl-4">{recommendation.marketAnalysis.industrySize}</p>
+                <p><strong>成长性：</strong></p>
+                <p className="pl-4">{recommendation.marketAnalysis.growth}</p>
+                <p><strong>成熟度：</strong></p>
+                <p className="pl-4">{recommendation.marketAnalysis.maturity}</p>
+                <p><strong>竞争格局：</strong></p>
+                <p className="pl-4">{recommendation.marketAnalysis.competition}</p>
+              </div>
+            </section>
+            
+            {/* 投资建议 */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4">六、投资建议</h2>
+              <div className="space-y-2">
+                <p><strong>融资计划：</strong></p>
+                <p className="pl-4">{recommendation.investmentSuggestion.financingPlan}</p>
+                <p><strong>估值分析：</strong></p>
+                <p className="pl-4">{recommendation.investmentSuggestion.valuationAnalysis}</p>
+                <p><strong>风险：</strong></p>
+                <p className="pl-4">{recommendation.investmentSuggestion.risks}</p>
+                <p><strong>机会：</strong></p>
+                <p className="pl-4">{recommendation.investmentSuggestion.opportunities}</p>
+                <p><strong>建议：</strong></p>
+                <p className="pl-4">{recommendation.investmentSuggestion.recommendation}</p>
+              </div>
+            </section>
+          </div>
+        </CardContent>
+        <CardFooter className="border-t pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+          <p className="text-sm text-muted-foreground w-full text-center">本报告由投资尽调报告生成器生成，仅供参考</p>
+          
+
+        </CardFooter>
+      </Card>
       
       {/* 分享对话框 */}
       <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
