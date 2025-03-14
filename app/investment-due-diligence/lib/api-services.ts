@@ -7,10 +7,9 @@ import {
 } from '../models/types';
 
 // 创建API客户端实例
-const qccClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_QCC_API_URL,
+const apiClient = axios.create({
+  baseURL: '/api',
   headers: {
-    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_QCC_API_KEY}`,
     'Content-Type': 'application/json',
   }
 });
@@ -34,14 +33,39 @@ const deepseekClient = axios.create({
 // 企查查企业高级搜索API
 export async function searchCompany(query: string): Promise<QccCompanySearchResult[]> {
   try {
-    // 模拟API响应，实际项目中需要替换为真实API调用
-    // const response = await qccClient.post('/api/enterprise/search', { keyword: query });
-    // return response.data.Result;
+    if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+      // 开发时使用模拟数据
+      return mockSearchCompany(query);
+    }
     
-    // 开发时的模拟数据
-    return mockSearchCompany(query);
+    // 调用我们的代理API路由
+    const response = await apiClient.get('/qcc/search', { 
+      params: { query }
+    });
+    
+    // 检查API响应状态
+    if (response.data.Status !== '200') {
+      throw new Error(`API错误: ${response.data.Message}`);
+    }
+    
+    // 转换为应用所需的数据格式
+    return (response.data.Result || []).map((item: any) => ({
+      Name: item.Name,
+      KeyNo: item.KeyNo,
+      CreditCode: item.CreditCode,
+      OperName: item.OperName,
+      Address: item.Address,
+      StartDate: item.StartDate,
+      RegCapital: item.RegistCapi,
+      Status: item.Status
+    }));
   } catch (error) {
     console.error('搜索公司失败:', error);
+    // 如果是开发环境但模拟数据标志未设置，则返回模拟数据
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('使用模拟数据作为备选');
+      return mockSearchCompany(query);
+    }
     throw new Error('搜索公司时发生错误');
   }
 }
@@ -49,14 +73,47 @@ export async function searchCompany(query: string): Promise<QccCompanySearchResu
 // 企查查企业信息核验API
 export async function getCompanyDetail(keyNo: string): Promise<QccCompanyDetail> {
   try {
-    // 模拟API响应，实际项目中需要替换为真实API调用
-    // const response = await qccClient.post('/api/enterprise/detail', { keyNo });
-    // return response.data.Result.Data;
+    if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
+      // 开发时使用模拟数据
+      return mockGetCompanyDetail(keyNo);
+    }
     
-    // 开发时的模拟数据
-    return mockGetCompanyDetail(keyNo);
+    // 调用我们的代理API路由
+    const response = await apiClient.get('/qcc/detail', { 
+      params: { keyNo }
+    });
+    
+    // 检查API响应状态
+    if (response.data.Status !== '200') {
+      throw new Error(`API错误: ${response.data.Message}`);
+    }
+    
+    // 假设返回的数据格式与示例中的一致
+    const data = response.data.Result.Data;
+    
+    // 转换为应用所需的数据格式
+    return {
+      KeyNo: data.KeyNo,
+      Name: data.Name,
+      CreditCode: data.CreditCode,
+      OperName: data.OperName,
+      Status: data.Status,
+      StartDate: data.StartDate,
+      RegistCapi: data.RegistCapi,
+      RegisteredCapital: data.RegisteredCapital,
+      RegisteredCapitalUnit: data.RegisteredCapitalUnit,
+      RegisteredCapitalCCY: data.RegisteredCapitalCCY,
+      Address: data.Address,
+      Scope: data.Scope,
+      ContactInfo: data.ContactInfo
+    };
   } catch (error) {
     console.error('获取公司详情失败:', error);
+    // 如果是开发环境但模拟数据标志未设置，则返回模拟数据
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('使用模拟数据作为备选');
+      return mockGetCompanyDetail(keyNo);
+    }
     throw new Error('获取公司详情时发生错误');
   }
 }
