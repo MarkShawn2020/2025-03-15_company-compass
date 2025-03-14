@@ -1,47 +1,47 @@
 'use client'
 
 import {
-    Button
+  Button
 } from '@/components/ui/button'
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog'
 import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
 } from '@/components/ui/tabs'
 import { saveAs } from 'file-saver'
 import { useAtom } from 'jotai'
 import jsPDF from 'jspdf'
 import {
-    CheckCircle,
-    Copy,
-    Download,
-    FileText,
-    Printer,
-    Share2
+  CheckCircle,
+  Copy,
+  Download,
+  FileText,
+  Printer,
+  Share2
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { InvestmentRecommendation } from '../../models/types'
 import {
-    investmentRecommendationAtom,
-    selectedCompanyAtom
+  investmentRecommendationAtom,
+  selectedCompanyAtom
 } from '../../stores/investmentStore'
 
 // 导入中文字体支持
@@ -219,15 +219,85 @@ export function ExportStep() {
     return html
   }
 
-  // 导出为DOCX (简化方法 - 实际上只是提供markdown下载)
+  // 导出为DOCX (使用HTML方式)
   const exportToDocx = async (markdown: string, filename: string) => {
-    // 由于没有专门的docx库，我们先提供一个markdown文件下载
-    // 实际项目中，建议引入专门的库如docx进行处理
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
-    saveAs(blob, `${filename}.md`)
-    
-    // 提示用户关于Word转换的信息
-    alert('已生成Markdown文件。请注意：为了将其转换为DOCX格式，您可以：\n1. 使用Microsoft Word打开并保存为DOCX\n2. 使用在线工具如Pandoc进行转换\n3. 在下一版本中，我们将添加直接生成DOCX的功能')
+    try {
+      // 将Markdown转换为HTML
+      const htmlContent = markdownToHtml(markdown)
+      
+      // 完整的HTML文档
+      const fullHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+              xmlns:w="urn:schemas-microsoft-com:office:word" 
+              xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta charset="utf-8">
+            <title>${filename}</title>
+            <style>
+              body {
+                font-family: "Microsoft YaHei", "微软雅黑", SimHei, "黑体", Arial, sans-serif;
+                padding: 20px;
+                line-height: 1.5;
+                font-size: 12pt;
+              }
+              h1 { font-size: 18pt; text-align: center; margin-bottom: 20px; }
+              h2 { font-size: 14pt; margin-top: 30px; margin-bottom: 15px; }
+              .meta { text-align: center; color: #666; margin-bottom: 30px; }
+              strong { font-weight: bold; }
+              p { margin-bottom: 10px; }
+              .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
+              
+              /* Word专用样式 */
+              @page Section1 {
+                mso-header-margin:.5in;
+                mso-footer-margin:.5in;
+                mso-paper-source:0;
+              }
+              div.Section1 {page:Section1;}
+              
+              /* 表格样式 */
+              table {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 15px 0;
+              }
+              td, th {
+                border: 1px solid #ddd;
+                padding: 8px;
+              }
+            </style>
+            <!-- 告诉浏览器这是Word文档 -->
+            <!--[if gte mso 9]>
+            <xml>
+              <w:WordDocument>
+                <w:View>Print</w:View>
+                <w:Zoom>100</w:Zoom>
+                <w:DoNotOptimizeForBrowser/>
+              </w:WordDocument>
+            </xml>
+            <![endif]-->
+          </head>
+          <body>
+            <div class="Section1">
+              ${htmlContent}
+            </div>
+          </body>
+        </html>
+      `;
+      
+      // 创建Blob对象
+      const blob = new Blob([fullHtml], { type: 'application/msword;charset=utf-8' });
+      
+      // 下载文件
+      saveAs(blob, `${filename}.doc`);
+      
+      // 显示使用说明
+      alert('Word文档已生成。\n\n打开文件后，请注意：\n1. 如果看到格式警告，请点击"是"继续\n2. 在Word中选择"另存为"并选择".docx"格式以获得最佳兼容性');
+      
+    } catch (error) {
+      console.error('Word文档生成失败:', error);
+      throw new Error('Word文档生成失败');
+    }
   }
 
   // 处理打印
