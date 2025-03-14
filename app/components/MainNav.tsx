@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { FileSearch, Home, Settings } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
@@ -20,7 +21,8 @@ export function MainNav() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <FileSearch className="h-6 w-6 text-orange-500" />
+            {/* <FileSearch className="h-6 w-6 text-orange-500" /> */}
+            <Image src="/logo.png" alt="logo" width={32} height={32} />
             <span className="text-lg font-bold">投资尽调报告生成器</span>
           </Link>
         </div>

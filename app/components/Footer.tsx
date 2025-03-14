@@ -1,6 +1,6 @@
-import { FileText, Github } from "lucide-react"
+import { Github } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
-
 export function Footer() {
   const currentYear = new Date().getFullYear()
   
@@ -9,7 +9,8 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-orange-500" />
+            {/* <FileText className="h-5 w-5 text-orange-500" /> */}
+            <Image src="/logo.png" alt="logo" width={24} height={24} />
             <span className="text-sm font-medium">投资尽调报告生成器</span>
           </div>
           
