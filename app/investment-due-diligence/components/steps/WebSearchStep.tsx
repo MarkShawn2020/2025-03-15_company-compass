@@ -1,37 +1,41 @@
 'use client'
 
 import {
-    Button
+  Button
 } from '@/components/ui/button'
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAtom } from 'jotai'
 import {
-    ArrowRight,
-    ExternalLink,
-    Loader2,
-    RefreshCw
+  ArrowRight,
+  ExternalLink,
+  Grid,
+  LayoutList,
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
 import { useEffect } from 'react'
 
 import {
-    webSearch
+  webSearch
 } from '../../lib/api-services'
 import {
-    WorkflowStep
+  WorkflowStep
 } from '../../models/types'
 import {
-    companyDetailAtom,
-    currentStepAtom,
-    errorStateAtom,
-    loadingStateAtom,
-    selectedCompanyAtom,
-    webSearchResultsAtom
+  companyDetailAtom,
+  currentStepAtom,
+  errorStateAtom,
+  loadingStateAtom,
+  selectedCompanyAtom,
+  webSearchLayoutAtom,
+  webSearchResultsAtom
 } from '../../stores/investmentStore'
 
 export function WebSearchStep() {
@@ -42,6 +46,7 @@ export function WebSearchStep() {
   const [currentStep, setCurrentStep] = useAtom(currentStepAtom)
   const [loadingState, setLoadingState] = useAtom(loadingStateAtom)
   const [errorState, setErrorState] = useAtom(errorStateAtom)
+  const [layout, setLayout] = useAtom(webSearchLayoutAtom)
 
   // 当组件挂载或公司详情变化时执行网络搜索
   useEffect(() => {
@@ -74,10 +79,73 @@ export function WebSearchStep() {
     }
   }
 
+  // 布局切换
+  const handleLayoutChange = (value: string) => {
+    setLayout(value as 'grid' | 'card')
+  }
+
   // 进入下一步
   const handleNext = () => {
     setCurrentStep(WorkflowStep.GENERATE_RECOMMENDATION)
   }
+
+  // 渲染网格布局（精简模式）
+  const renderGridLayout = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {webSearchResults.map((result, index) => (
+        <a 
+          key={index}
+          href={result.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex-shrink-0 w-6 h-6 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mr-3">
+            {result.siteName?.[0] || 'W'}
+          </div>
+          <div className="overflow-hidden">
+            <h3 className="text-sm font-medium text-blue-600 truncate">{result.name}</h3>
+          </div>
+        </a>
+      ))}
+    </div>
+  )
+
+  // 渲染卡片布局（详细模式）
+  const renderCardLayout = () => (
+    <div className="space-y-4">
+      {webSearchResults.map((result, index) => (
+        <Card key={index} className="overflow-hidden">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">
+              <a 
+                href={result.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline flex items-center"
+              >
+                {result.name}
+                <ExternalLink className="h-4 w-4 ml-1" />
+              </a>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              来源: {result.siteName || '未知'} · 
+              时间: {result.dateLastCrawled ? new Date(result.dateLastCrawled).toLocaleDateString() : '未知'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-sm">{result.snippet}</p>
+            {result.summary && (
+              <div className="mt-2 text-sm bg-muted p-2 rounded-md">
+                <p className="font-semibold">摘要:</p>
+                <p>{result.summary}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
 
   if (!companyDetail) {
     return (
@@ -105,45 +173,33 @@ export function WebSearchStep() {
       ) : webSearchResults.length > 0 ? (
         <>
           <Card>
-            <CardHeader>
-              <CardTitle>网络搜索结果</CardTitle>
-              <CardDescription>
-                关于 {companyDetail.Name} 的网络信息，共 {webSearchResults.length} 条结果
-              </CardDescription>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>网络搜索结果</CardTitle>
+                  <CardDescription>
+                    关于 {companyDetail.Name} 的网络信息，共 {webSearchResults.length} 条结果
+                  </CardDescription>
+                </div>
+                <Tabs 
+                  value={layout} 
+                  onValueChange={handleLayoutChange}
+                  className="ml-auto"
+                >
+                  <TabsList className="grid w-20 grid-cols-2">
+                    <TabsTrigger value="grid" title="精简布局" aria-label="切换到精简网格布局">
+                      <Grid className="h-4 w-4" />
+                    </TabsTrigger>
+                    <TabsTrigger value="card" title="详细卡片" aria-label="切换到详细卡片布局">
+                      <LayoutList className="h-4 w-4" />
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {webSearchResults.map((result, index) => (
-                  <Card key={index} className="overflow-hidden">
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-base">
-                        <a 
-                          href={result.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline flex items-center"
-                        >
-                          {result.name}
-                          <ExternalLink className="h-4 w-4 ml-1" />
-                        </a>
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        来源: {result.siteName || '未知'} · 
-                        时间: {result.dateLastCrawled ? new Date(result.dateLastCrawled).toLocaleDateString() : '未知'}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <p className="text-sm">{result.snippet}</p>
-                      {result.summary && (
-                        <div className="mt-2 text-sm bg-muted p-2 rounded-md">
-                          <p className="font-semibold">摘要:</p>
-                          <p>{result.summary}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              {/* 根据选择的布局展示不同的内容 */}
+              {layout === 'grid' ? renderGridLayout() : renderCardLayout()}
               
               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
                 <p className="text-sm text-amber-800">

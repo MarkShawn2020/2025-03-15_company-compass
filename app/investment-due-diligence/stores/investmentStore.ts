@@ -48,8 +48,14 @@ export const resetCompanyDetailAtom = atom(
 
 // 博查网络搜索结果状态
 export const webSearchResultsAtom = atomWithStorage<BochaSearchResult[]>(
-  'investment-due-diligence-web-search-results',
+  'webSearchResults',
   []
+)
+
+// 网络搜索结果布局选择（grid或card）
+export const webSearchLayoutAtom = atomWithStorage<'grid' | 'card'>(
+  'webSearchLayout',
+  'grid' // 默认使用精简网格布局
 )
 
 // 生成的投资建议书状态
