@@ -26,7 +26,6 @@ import {
 } from '@/components/ui/table'
 import { saveAs } from 'file-saver'
 import { useAtom } from 'jotai'
-import jsPDF from 'jspdf'
 import {
   CheckCircle,
   Copy,
@@ -100,74 +99,149 @@ export function ExportStep() {
   // 导出为PDF
   const exportToPdf = async (markdown: string, filename: string) => {
     try {
-      // 创建支持中文的PDF文档
-      const doc = new jsPDF()
+      // 获取预览内容的克隆，而不是从Markdown重新生成
+      const previewContent = document.querySelector('.max-w-3xl')
+      if (!previewContent) {
+        throw new Error('无法获取预览内容')
+      }
       
-      // 使用html2canvas转换内容为图片，避免中文字体问题
-      const contentElement = document.createElement('div')
-      contentElement.style.width = '595px' // A4宽度（72dpi）
-      contentElement.style.padding = '40px'
-      contentElement.style.boxSizing = 'border-box'
-      contentElement.style.fontFamily = 'Arial, "Microsoft YaHei", "微软雅黑", SimHei, "黑体", sans-serif'
-      contentElement.style.lineHeight = '1.5'
-      contentElement.style.fontSize = '14px'
+      // 克隆节点以避免修改原始DOM
+      const contentElement = previewContent.cloneNode(true) as HTMLElement
       
-      // 将Markdown转换为HTML
-      const htmlContent = markdownToHtml(markdown)
-      contentElement.innerHTML = htmlContent
-      
-      // 添加到DOM以便转换
-      document.body.appendChild(contentElement)
+      // 应用打印样式
+      const printStyles = document.createElement('style')
+      printStyles.textContent = `
+        body {
+          font-family: Arial, "Microsoft YaHei", "微软雅黑", SimHei, "黑体", sans-serif;
+          padding: 40px;
+          max-width: 800px;
+          margin: 0 auto;
+          line-height: 1.5;
+          color: #000;
+          background: #fff;
+        }
+        
+        /* 重置一些可能影响打印的样式 */
+        * {
+          box-sizing: border-box;
+        }
+        
+        h1 {
+          font-size: 24px;
+          text-align: center;
+          margin-bottom: 20px;
+          font-weight: bold;
+        }
+        
+        h2 {
+          font-size: 18px;
+          margin-top: 30px;
+          margin-bottom: 15px;
+          font-weight: bold;
+        }
+        
+        .meta {
+          text-align: center;
+          color: #666;
+          margin-bottom: 30px;
+        }
+        
+        /* 表格样式 */
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 15px 0 25px 0;
+        }
+        
+        th, td {
+          border: 1px solid #000;
+          padding: 8px 12px;
+          text-align: left;
+        }
+        
+        th {
+          background-color: #f0f0f0;
+          font-weight: bold;
+          width: 25%;
+        }
+        
+        /* 内容样式 */
+        section {
+          margin-bottom: 25px;
+        }
+        
+        p {
+          margin-bottom: 10px;
+        }
+        
+        .footer {
+          margin-top: 40px;
+          text-align: center;
+          color: #666;
+          font-style: italic;
+          border-top: 1px solid #eaeaea;
+          padding-top: 20px;
+        }
+        
+        /* 打印特定样式 */
+        @media print {
+          body {
+            padding: 0;
+          }
+          @page {
+            margin: 2cm;
+            size: A4;
+          }
+          button, .no-print {
+            display: none !important;
+          }
+        }
+      `
       
       // 使用浏览器的打印功能
       const printWindow = window.open('', '_blank')
       if (printWindow) {
+        // 准备打印文档
         printWindow.document.write(`
           <html>
             <head>
               <title>${filename}</title>
-              <style>
-                body {
-                  font-family: Arial, "Microsoft YaHei", "微软雅黑", SimHei, "黑体", sans-serif;
-                  padding: 40px;
-                  max-width: 800px;
-                  margin: 0 auto;
-                  line-height: 1.5;
-                }
-                h1 { font-size: 24px; text-align: center; margin-bottom: 20px; }
-                h2 { font-size: 18px; margin-top: 30px; margin-bottom: 15px; }
-                .meta { text-align: center; color: #666; margin-bottom: 30px; }
-                strong { font-weight: bold; }
-                p { margin-bottom: 10px; }
-                .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
-                
-                /* 表格样式 */
-                table {
-                  width: 100%;
-                  border-collapse: collapse;
-                  margin: 15px 0;
-                }
-                th, td {
-                  border: 1px solid #ddd;
-                  padding: 8px;
-                  text-align: left;
-                }
-                th {
-                  background-color: #f8f8f8;
-                  font-weight: bold;
-                }
-                
-                @media print {
-                  body { padding: 0; }
-                  @page { margin: 2cm; }
-                }
-              </style>
+              ${printStyles.outerHTML}
             </head>
             <body>
-              ${htmlContent}
+              <h1>${selectedCompany?.Name || '企业'} 投资建议书</h1>
+              <div class="meta">生成日期: ${new Date().toLocaleDateString()}</div>
+              ${contentElement.outerHTML}
+              <div class="footer">本报告由投资尽调报告生成器生成，仅供参考</div>
               <script>
-                // 自动打印并关闭窗口
+                // 处理打印后的动作
                 window.onload = function() {
+                  // 移除不需要打印的元素
+                  document.querySelectorAll('button, .no-print').forEach(el => el.remove());
+                  
+                  // 确保表格样式正确
+                  document.querySelectorAll('table').forEach(table => {
+                    table.border = '1';
+                    table.style.width = '100%';
+                    table.style.borderCollapse = 'collapse';
+                    table.style.marginBottom = '25px';
+                    
+                    // 设置单元格样式
+                    table.querySelectorAll('th, td').forEach(cell => {
+                      cell.style.border = '1px solid #000';
+                      cell.style.padding = '8px 12px';
+                      cell.style.textAlign = 'left';
+                    });
+                    
+                    // 设置表头样式
+                    table.querySelectorAll('th').forEach(th => {
+                      th.style.backgroundColor = '#f0f0f0';
+                      th.style.fontWeight = 'bold';
+                      th.style.width = '25%';
+                    });
+                  });
+                  
+                  // 自动打印并关闭窗口
                   setTimeout(function() {
                     window.print();
                     setTimeout(function() { window.close(); }, 500);
@@ -180,7 +254,7 @@ export function ExportStep() {
         printWindow.document.close()
       } else {
         // 如果无法打开新窗口，提供下载HTML文件的选项
-        const blob = new Blob([`
+        const htmlContent = `
           <html>
             <head>
               <title>${filename}</title>
@@ -195,38 +269,36 @@ export function ExportStep() {
                 h1 { font-size: 24px; text-align: center; margin-bottom: 20px; }
                 h2 { font-size: 18px; margin-top: 30px; margin-bottom: 15px; }
                 .meta { text-align: center; color: #666; margin-bottom: 30px; }
-                strong { font-weight: bold; }
-                p { margin-bottom: 10px; }
-                .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
                 
                 /* 表格样式 */
                 table {
                   width: 100%;
                   border-collapse: collapse;
-                  margin: 15px 0;
+                  margin: 15px 0 25px 0;
                 }
                 th, td {
-                  border: 1px solid #ddd;
-                  padding: 8px;
+                  border: 1px solid #000;
+                  padding: 8px 12px;
                   text-align: left;
                 }
                 th {
-                  background-color: #f8f8f8;
+                  background-color: #f0f0f0;
                   font-weight: bold;
+                  width: 25%;
                 }
+                
+                .footer { margin-top: 40px; text-align: center; color: #666; font-style: italic; }
               </style>
             </head>
             <body>
-              ${htmlContent}
+              ${contentElement.outerHTML}
             </body>
           </html>
-        `], { type: 'text/html;charset=utf-8' })
+        `
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
         saveAs(blob, `${filename}.html`)
         alert('浏览器阻止了打开新窗口。已将报告保存为HTML文件，您可以使用浏览器打开并打印为PDF。')
       }
-      
-      // 清理DOM
-      document.body.removeChild(contentElement)
     } catch (error) {
       console.error('PDF生成失败:', error)
       throw new Error('PDF生成失败')
@@ -269,13 +341,7 @@ export function ExportStep() {
         tableHtml += '</table>';
         return tableHtml;
       })
-    
-    // 包装在段落中
-    html = `<h1>${recommendation?.companyBasicInfo.name || '企业'} 投资建议书</h1>
-<div class="meta">生成日期: ${new Date().toLocaleDateString()}</div>
-<p>${html}</p>
-<div class="footer">本报告由投资尽调报告生成器生成，仅供参考</div>`
-    
+       
     return html
   }
 
