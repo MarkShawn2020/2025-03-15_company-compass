@@ -38,6 +38,14 @@ export const companyDetailAtom = atomWithStorage<QccCompanyDetail | null>(
   null
 )
 
+// 重置公司详情，用于在选择新公司时清除旧数据
+export const resetCompanyDetailAtom = atom(
+  null,
+  (get, set) => {
+    set(companyDetailAtom, null)
+  }
+)
+
 // 博查网络搜索结果状态
 export const webSearchResultsAtom = atomWithStorage<BochaSearchResult[]>(
   'investment-due-diligence-web-search-results',

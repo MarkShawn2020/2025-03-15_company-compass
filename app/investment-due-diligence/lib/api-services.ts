@@ -1,9 +1,9 @@
 import axios from 'axios';
 import {
-    BochaSearchResult,
-    InvestmentRecommendation,
-    QccCompanyDetail,
-    QccCompanySearchResult
+  BochaSearchResult,
+  InvestmentRecommendation,
+  QccCompanyDetail,
+  QccCompanySearchResult
 } from '../models/types';
 
 // 创建API客户端实例
@@ -13,6 +13,20 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   }
 });
+
+// 添加响应拦截器来处理错误
+apiClient.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API请求错误:', error);
+    // 如果有响应数据，则提取错误信息
+    if (error.response && error.response.data) {
+      const errorMessage = error.response.data.error || error.response.data.message || '未知错误';
+      return Promise.reject(new Error(errorMessage));
+    }
+    return Promise.reject(error);
+  }
+);
 
 const bochaClient = axios.create({
   baseURL: 'https://api.bochaai.com/v1',
@@ -71,24 +85,34 @@ export async function searchCompany(query: string): Promise<QccCompanySearchResu
 }
 
 // 企查查企业信息核验API
-export async function getCompanyDetail(keyNo: string): Promise<QccCompanyDetail> {
+export async function getCompanyDetail(searchKey: string): Promise<QccCompanyDetail> {
   try {
     if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
-      // 开发时使用模拟数据
-      return mockGetCompanyDetail(keyNo);
+      console.log('使用模拟数据获取公司详情');
+      return mockGetCompanyDetail(searchKey);
     }
+    
+    console.log('正在获取公司详情，KeyNo:', searchKey);
     
     // 调用我们的代理API路由
     const response = await apiClient.get('/qcc/detail', { 
-      params: { keyNo }
+      params: { searchKey }
     });
+    
+    // 打印原始响应数据以便调试
+    console.log('企业详情API响应:', JSON.stringify(response.data).substring(0, 500) + '...');
     
     // 检查API响应状态
     if (response.data.Status !== '200') {
       throw new Error(`API错误: ${response.data.Message}`);
     }
     
-    // 假设返回的数据格式与示例中的一致
+    // 检查是否有结果数据
+    if (!response.data.Result || !response.data.Result.Data) {
+      throw new Error('API响应中缺少数据');
+    }
+    
+    // 获取数据
     const data = response.data.Result.Data;
     
     // 转换为应用所需的数据格式
@@ -112,9 +136,9 @@ export async function getCompanyDetail(keyNo: string): Promise<QccCompanyDetail>
     // 如果是开发环境但模拟数据标志未设置，则返回模拟数据
     if (process.env.NODE_ENV === 'development') {
       console.warn('使用模拟数据作为备选');
-      return mockGetCompanyDetail(keyNo);
+      return mockGetCompanyDetail(searchKey);
     }
-    throw new Error('获取公司详情时发生错误');
+    throw new Error(`获取公司详情时发生错误: ${error instanceof Error ? error.message : '未知错误'}`);
   }
 }
 

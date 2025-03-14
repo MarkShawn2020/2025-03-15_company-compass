@@ -1,35 +1,35 @@
 'use client'
 
 import {
-    Button
+  Button
 } from '@/components/ui/button'
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card'
 import { useAtom } from 'jotai'
 import {
-    ArrowRight,
-    Loader2,
-    RefreshCw
+  ArrowRight,
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
 import { useEffect } from 'react'
 
 import {
-    getCompanyDetail
+  getCompanyDetail
 } from '../../lib/api-services'
 import {
-    WorkflowStep
+  WorkflowStep
 } from '../../models/types'
 import {
-    companyDetailAtom,
-    currentStepAtom,
-    errorStateAtom,
-    loadingStateAtom,
-    selectedCompanyAtom
+  companyDetailAtom,
+  currentStepAtom,
+  errorStateAtom,
+  loadingStateAtom,
+  selectedCompanyAtom
 } from '../../stores/investmentStore'
 
 export function CompanyInfoStep() {
@@ -42,22 +42,29 @@ export function CompanyInfoStep() {
 
   // 当组件挂载或选中公司变化时加载公司详情
   useEffect(() => {
-    if (selectedCompany && !companyDetail) {
-      fetchCompanyDetail()
+    if (selectedCompany) {
+      // 当选择新公司时，清除旧的公司详情并重新获取
+      if (!companyDetail || companyDetail.KeyNo !== selectedCompany.KeyNo) {
+        fetchCompanyDetail()
+      }
     }
-  }, [selectedCompany])
+  }, [selectedCompany, companyDetail])
 
   // 加载公司详情
   const fetchCompanyDetail = async () => {
     if (!selectedCompany) return
     
+    // 清除旧的详情数据，确保显示加载状态
+    setCompanyDetail(null)
     setLoadingState({ ...loadingState, isLoadingCompanyDetail: true })
     setErrorState({ ...errorState, companyDetailError: null })
     
     try {
+      console.log('获取公司详情，KeyNo:', selectedCompany.KeyNo)
       const details = await getCompanyDetail(selectedCompany.KeyNo)
       setCompanyDetail(details)
     } catch (error) {
+      console.error('获取公司详情失败:', error)
       setErrorState({ 
         ...errorState, 
         companyDetailError: error instanceof Error ? error.message : '获取公司详情时发生未知错误' 
@@ -159,6 +166,8 @@ export function CompanyInfoStep() {
               )}
             </CardContent>
           </Card>
+
+
 
           <div className="flex justify-end mt-4">
             <Button onClick={handleNext}>

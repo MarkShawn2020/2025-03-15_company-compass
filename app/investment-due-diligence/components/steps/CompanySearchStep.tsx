@@ -40,6 +40,7 @@ import {
     errorStateAtom,
     loadingStateAtom,
     qccSearchResultsAtom,
+    resetCompanyDetailAtom,
     searchQueryAtom,
     selectedCompanyAtom
 } from '../../stores/investmentStore'
@@ -55,6 +56,7 @@ export function CompanySearchStep() {
   const [currentStep, setCurrentStep] = useAtom(currentStepAtom)
   const [loadingState, setLoadingState] = useAtom(loadingStateAtom)
   const [errorState, setErrorState] = useAtom(errorStateAtom)
+  const [, resetCompanyDetail] = useAtom(resetCompanyDetailAtom)
 
   // 处理搜索
   const handleSearch = async () => {
@@ -81,7 +83,12 @@ export function CompanySearchStep() {
 
   // 处理公司选择
   const handleSelectCompany = (company: QccCompanySearchResult) => {
+    // 重置公司详情，确保会重新获取新选择的公司详情
+    resetCompanyDetail()
+    
+    // 然后设置新选中的公司
     setSelectedCompany(company)
+    
     // 自动前进到下一步
     setCurrentStep(WorkflowStep.COMPANY_INFO)
   }
